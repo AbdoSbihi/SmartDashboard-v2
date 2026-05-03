@@ -11,12 +11,12 @@ open WebSharper.UI.Notation
 [<JavaScript>]
 module Client =
 
-    // ── GLOBAL STATE 
+    // ── STATE ────────────────────────────────────────────────
     let state       : Var<AppState> = Var.Create AppState.init
     let cityInput   : Var<string>   = Var.Create "Budapest"
     let amountInput : Var<string>   = Var.Create "1"
 
-    // ── HELPERS 
+    // ── HELPERS ──────────────────────────────────────────────
     let getElementValue (el: Dom.Element) : string =
         JS.Get<string> "value" el
 
@@ -25,12 +25,27 @@ module Client =
     let setNews     n = state.Value <- { state.Value with News     = n }
     let setCurrency c = state.Value <- { state.Value with Currency = c }
 
+    // Using string concat instead of format to avoid float/int tuple confusion
     let weatherIcon (code: string) : string =
-        sprintf "https://openweathermap.org/img/wn/%s@2x.png" code
+        "https://openweathermap.org/img/wn/" + code + "@2x.png"
 
-    let fmtTemp (t: float) : string = sprintf "%.1f°C" t
+    // Explicit float param + string concat avoids format string type errors
+    let fmtTemp (t: float) : string =
+        let rounded = Math.Round(t, 1)
+        string rounded + "°C"
 
-    // ── LOAD FUNCTIONS 
+    // ── ELEMENT HELPERS ──────────────────────────────────────
+    // These wrap Doc.Element to guarantee Doc return type everywhere
+    let el (tag: string) (cls: string) (children: Doc list) : Doc =
+        Doc.Element tag [attr.``class`` cls] children
+
+    let elA (tag: string) (attrs: Attr list) (children: Doc list) : Doc =
+        Doc.Element tag attrs children
+
+    let txt (s: string) : Doc =
+        Doc.TextNode s
+
+    // ── LOAD FUNCTIONS ───────────────────────────────────────
     let loadWeather (city: string) =
         setWeather Fetching
         setForecast Fetching
@@ -72,334 +87,269 @@ module Client =
         loadNews     s.NewsCategory
         loadCurrency s.BaseCurrency
 
-    // ── WIDGET SHELL 
+    // ── WIDGET CARD ──────────────────────────────────────────
     let widgetCard (title: string) (icon: string) (onRefresh: unit -> unit) (content: Doc) : Doc =
-        div [attr.``class`` "widget-card"] [
-            div [attr.``class`` "widget-header"] [
-                div [attr.``class`` "widget-title"] [
-                    span [attr.``class`` "widget-icon"] [text icon]
-                    span [] [text title]
+        el "div" "widget-card" [
+            el "div" "widget-header" [
+                el "div" "widget-title" [
+                    el "span" "widget-icon" [txt icon]
+                    txt title
                 ]
-                button [
+                elA "button" [
                     attr.``class`` "btn-refresh"
                     on.click (fun _ _ -> onRefresh ())
-                ] [text "↻"]
+                ] [txt "↻"]
             ]
-            div [attr.``class`` "widget-body"] [content]
+            el "div" "widget-body" [content]
         ]
 
+    // ── WIDGET STATE ─────────────────────────────────────────
     let renderWidgetState (ws: WidgetState<'T>) (render: 'T -> Doc) : Doc =
         match ws with
-        | Idle     ->
-            div [attr.``class`` "widget-idle"] [text "Click ↻ to load"] :> Doc
-        | Fetching ->
-            div [attr.``class`` "widget-loading"] [
-                div [attr.``class`` "spinner"] []
-                span [] [text "Loading…"]
-            ] :> Doc
-        | Failed e ->
-            div [attr.``class`` "widget-error"] [text (sprintf "Error: %s" e)] :> Doc
-        | Loaded d ->
-            render d
+        | Idle     -> el "div" "widget-idle"    [txt "Click ↻ to load"]
+        | Fetching -> el "div" "widget-loading" [el "div" "spinner" []; txt "Loading…"]
+        | Failed e -> el "div" "widget-error"   [txt ("Error: " + e)]
+        | Loaded d -> render d
 
-    // ── WEATHER WIDGET 
+    // ── WEATHER ──────────────────────────────────────────────
     let weatherContent (data: WeatherData) : Doc =
         let temp     : float = data.TempC
         let feels    : float = data.FeelsLike
         let wind     : float = data.WindSpeed
         let humidity : int   = data.Humidity
-        div [attr.``class`` "weather-main"] [
-            div [attr.``class`` "weather-top"] [
-                img [
+        let humStr = string humidity + "%"
+        let windStr = string (Math.Round(wind, 1)) + " m/s"
+        el "div" "weather-main" [
+            el "div" "weather-top" [
+                elA "img" [
                     attr.src (weatherIcon data.Condition.Icon)
                     attr.``class`` "weather-icon-img"
                     attr.alt data.Condition.Description
-                ]
-                div [] [
-                    div [attr.``class`` "weather-temp"] [text (fmtTemp temp)]
-                    div [attr.``class`` "weather-city"] [text (sprintf "%s, %s" data.City data.Country)]
-                    div [attr.``class`` "weather-desc"] [text data.Condition.Description]
+                ] []
+                el "div" "weather-info" [
+                    el "div" "weather-temp" [txt (fmtTemp temp)]
+                    el "div" "weather-city" [txt (data.City + ", " + data.Country)]
+                    el "div" "weather-desc" [txt data.Condition.Description]
                 ]
             ]
-            div [attr.``class`` "weather-details"] [
-                div [attr.``class`` "weather-detail"] [
-                    span [attr.``class`` "detail-label"] [text "Feels like"]
-                    span [attr.``class`` "detail-value"] [text (fmtTemp feels)]
-                ]
-                div [attr.``class`` "weather-detail"] [
-                    span [attr.``class`` "detail-label"] [text "Humidity"]
-                    span [attr.``class`` "detail-value"] [text (sprintf "%d%%" humidity)]
-                ]
-                div [attr.``class`` "weather-detail"] [
-                    span [attr.``class`` "detail-label"] [text "Wind"]
-                    span [attr.``class`` "detail-value"] [text (sprintf "%.1f m/s" wind)]
-                ]
+            el "div" "weather-details" [
+                el "div" "weather-detail" [el "span" "detail-label" [txt "Feels like"]; el "span" "detail-value" [txt (fmtTemp feels)]]
+                el "div" "weather-detail" [el "span" "detail-label" [txt "Humidity"];   el "span" "detail-value" [txt humStr]]
+                el "div" "weather-detail" [el "span" "detail-label" [txt "Wind"];       el "span" "detail-value" [txt windStr]]
             ]
         ]
 
     let forecastContent (days: ForecastDay list) : Doc =
-        div [attr.``class`` "forecast-row"] (
+        let dayDocs : Doc list =
             days |> List.map (fun d ->
                 let tmax : float = d.TempMax
                 let tmin : float = d.TempMin
-                div [attr.``class`` "forecast-day"] [
-                    div [attr.``class`` "forecast-date"] [text d.Date]
-                    img [
-                        attr.src (weatherIcon d.Icon)
-                        attr.``class`` "forecast-icon"
-                        attr.alt d.Desc
+                el "div" "forecast-day" [
+                    el "div" "forecast-date" [txt d.Date]
+                    elA "img" [attr.src (weatherIcon d.Icon); attr.``class`` "forecast-icon"; attr.alt d.Desc] []
+                    el "div" "forecast-temps" [
+                        el "span" "temp-max" [txt (fmtTemp tmax)]
+                        el "span" "temp-min" [txt (fmtTemp tmin)]
                     ]
-                    div [attr.``class`` "forecast-temps"] [
-                        span [attr.``class`` "temp-max"] [text (fmtTemp tmax)]
-                        span [attr.``class`` "temp-min"] [text (fmtTemp tmin)]
-                    ]
-                ] :> Doc
-            )
-        )
+                ])
+        el "div" "forecast-row" dayDocs
 
     let weatherWidget () : Doc =
         let searchBar =
-            div [attr.``class`` "search-bar"] [
-                Doc.InputType.Text
-                    [attr.``class`` "search-input"; attr.placeholder "Search city…"]
-                    cityInput
-                button [
+            el "div" "search-bar" [
+                Doc.InputType.Text [attr.``class`` "search-input"; attr.placeholder "Search city…"] cityInput
+                elA "button" [
                     attr.``class`` "btn-search"
                     on.click (fun _ _ ->
                         let city = cityInput.Value.Trim()
                         if city <> "" then
                             state.Value <- { state.Value with City = city }
                             loadWeather city)
-                ] [text "Search"]
+                ] [txt "Search"]
             ]
-        div [] [
+        el "div" "weather-widget" [
             searchBar
             state.View |> Doc.BindView (fun s ->
-                let weatherDoc  = renderWidgetState s.Weather weatherContent
-                let forecastDoc =
+                let wDoc = renderWidgetState s.Weather weatherContent
+                let fDoc =
                     match s.Forecast with
                     | Loaded days -> forecastContent days
                     | _           -> Doc.Empty
-                Doc.Concat [weatherDoc; forecastDoc])
+                el "div" "weather-results" [wDoc; fDoc])
         ]
 
-    // ── NEWS WIDGET 
+    // ── NEWS ─────────────────────────────────────────────────
     let newsArticle (a: NewsArticle) : Doc =
-        Doc.Element "a" [
-            attr.href      a.Url
-            attr.target    "_blank"
-            attr.rel       "noopener noreferrer"
-            attr.``class`` "news-card"
+        let imgDoc : Doc =
+            if a.ImageUrl <> "" then
+                elA "img" [attr.src a.ImageUrl; attr.``class`` "news-img"; attr.alt a.Title] []
+            else Doc.Empty
+        elA "a" [
+            attr.href a.Url; attr.target "_blank"
+            attr.rel "noopener noreferrer"; attr.``class`` "news-card"
         ] [
-            (if a.ImageUrl <> "" then
-                img [attr.src a.ImageUrl; attr.``class`` "news-img"; attr.alt a.Title] :> Doc
-             else Doc.Empty)
-            div [attr.``class`` "news-content"] [
-                div [attr.``class`` "news-source"] [text a.Source]
-                div [attr.``class`` "news-title"]  [text a.Title]
-                div [attr.``class`` "news-desc"]   [text a.Description]
-            ] :> Doc
-        ] :> Doc
+            imgDoc
+            el "div" "news-content" [
+                el "div" "news-source" [txt a.Source]
+                el "div" "news-title"  [txt a.Title]
+                el "div" "news-desc"   [txt a.Description]
+            ]
+        ]
 
     let newsWidget () : Doc =
-        let tabDocs =
+        let tabDocs : Doc list =
             NewsCategory.all |> List.map (fun cat ->
                 state.View |> Doc.BindView (fun s ->
-                    let isActive = s.NewsCategory = cat
-                    button [
-                        attr.``class`` (if isActive then "tab-btn tab-active" else "tab-btn")
+                    let cls = if s.NewsCategory = cat then "tab-btn tab-active" else "tab-btn"
+                    elA "button" [
+                        attr.``class`` cls
                         on.click (fun _ _ ->
                             state.Value <- { state.Value with NewsCategory = cat }
                             loadNews cat)
-                    ] [text cat.Label] :> Doc))
-        let tabs = div [attr.``class`` "news-tabs"] [Doc.Concat tabDocs]
-        div [] [
-            tabs
+                    ] [txt cat.Label]))
+        el "div" "news-widget" [
+            el "div" "news-tabs" tabDocs
             state.View |> Doc.BindView (fun s ->
                 renderWidgetState s.News (fun articles ->
-                    div [attr.``class`` "news-grid"] [
-                        Doc.Concat (articles |> List.map newsArticle)
-                    ]))
+                    el "div" "news-grid" (articles |> List.map newsArticle)))
         ]
 
-    // ── CURRENCY WIDGET 
+    // ── CURRENCY ─────────────────────────────────────────────
     let currencyWidget () : Doc =
+        let optDocs : Doc list =
+            Currency.supported |> List.map (fun (code, name, flag) ->
+                let attrs =
+                    if code = state.Value.BaseCurrency
+                    then [attr.value code; attr.selected "selected"]
+                    else [attr.value code]
+                elA "option" attrs [txt (flag + " " + code + " - " + name)])
+
         let baseSelector =
-            div [attr.``class`` "currency-controls"] [
-                div [attr.``class`` "form-field"] [
-                    label [] [text "Base Currency"]
-                    Doc.Element "select" [
+            el "div" "currency-controls" [
+                el "div" "form-field" [
+                    elA "label" [] [txt "Base Currency"]
+                    elA "select" [
                         attr.``class`` "form-select"
                         on.change (fun el _ ->
                             let code = getElementValue el
                             state.Value <- { state.Value with BaseCurrency = code }
                             loadCurrency code)
-                    ] [
-                        Doc.Concat (
-                            Currency.supported |> List.map (fun (code, name, flag) ->
-                                let isSelected = code = state.Value.BaseCurrency
-                                let attrs =
-                                    if isSelected
-                                    then [attr.value code; attr.selected "selected"]
-                                    else [attr.value code]
-                                Doc.Element "option" attrs
-                                    [Doc.TextNode (sprintf "%s %s - %s" flag code name)] :> Doc))
-                    ]
+                    ] optDocs
                 ]
-                div [attr.``class`` "form-field"] [
-                    label [] [text "Amount"]
-                    Doc.InputType.Text
-                        [attr.``class`` "form-input"; attr.placeholder "1.00"]
-                        amountInput
+                el "div" "form-field" [
+                    elA "label" [] [txt "Amount"]
+                    Doc.InputType.Text [attr.``class`` "form-input"; attr.placeholder "1.00"] amountInput
                 ]
             ]
 
         let ratesTable (rates: CurrencyRates) : Doc =
-            let amount =
+            let amountVal =
                 match Double.TryParse(amountInput.Value) with
                 | true, v -> v
                 | _       -> 1.0
-            div [] [
-                div [attr.``class`` "currency-updated"] [
-                    text (sprintf "Updated: %s" rates.UpdatedAt)
-                ]
-                Doc.Element "table" [attr.``class`` "rates-table"] [
-                    Doc.Element "thead" [] [
-                        Doc.Element "tr" [] [
-                            Doc.Concat [
-                                Doc.Element "th" [] [Doc.TextNode "Currency"]
-                                Doc.Element "th" [] [Doc.TextNode "Rate"]
-                                Doc.Element "th" [] [Doc.TextNode "Converted"]
-                            ]
+            let rowDocs : Doc list =
+                rates.Rates
+                |> List.filter (fun r -> r.Code <> rates.Base)
+                |> List.map (fun r ->
+                    let rate : float = r.Rate
+                    let prod : float = amountVal * rate
+                    // FIX: bind Math.Round result to avoid (float * int) tuple
+                    let conv : float = Math.Round(prod, 2)
+                    elA "tr" [] [
+                        elA "td" [] [txt (r.Flag + " " + r.Code)]
+                        elA "td" [attr.``class`` "rate-val"]       [txt (sprintf "%.4f" rate)]
+                        elA "td" [attr.``class`` "rate-converted"] [txt (sprintf "%.2f" conv + " " + r.Code)]
+                    ])
+            el "div" "rates-wrap" [
+                el "div" "currency-updated" [txt ("Updated: " + rates.UpdatedAt)]
+                elA "table" [attr.``class`` "rates-table"] [
+                    elA "thead" [] [
+                        elA "tr" [] [
+                            elA "th" [] [txt "Currency"]
+                            elA "th" [] [txt "Rate"]
+                            elA "th" [] [txt "Converted"]
                         ]
                     ]
-                    Doc.Element "tbody" [] [
-                        Doc.Concat (
-                            rates.Rates
-                            |> List.filter (fun r -> r.Code <> rates.Base)
-                            |> List.map (fun r ->
-                                let rate      : float = r.Rate
-                                let converted : float = Math.Round(amount * rate, 2)
-                                Doc.Element "tr" [] [
-                                    Doc.Concat [
-                                        Doc.Element "td" [] [
-                                            Doc.TextNode (sprintf "%s %s" r.Flag r.Code)]
-                                        Doc.Element "td" [attr.``class`` "rate-val"] [
-                                            Doc.TextNode (sprintf "%.4f" rate)]
-                                        Doc.Element "td" [attr.``class`` "rate-converted"] [
-                                            Doc.TextNode (sprintf "%.2f %s" converted r.Code)]
-                                    ]
-                                ] :> Doc))
-                    ]
+                    elA "tbody" [] rowDocs
                 ]
             ]
 
-        div [] [
+        el "div" "currency-widget" [
             baseSelector
             View.Map2
-                (fun s (amt: string) -> (s, amt))
-                state.View
-                amountInput.View
+                (fun (s: AppState) (amt: string) -> (s, amt))
+                state.View amountInput.View
             |> Doc.BindView (fun (s, _) ->
                 renderWidgetState s.Currency ratesTable)
         ]
 
-    // ── SETTINGS WIDGET 
+    // ── SETTINGS ─────────────────────────────────────────────
     let settingsWidget () : Doc =
         let saved = Var.Create ""
-        div [attr.``class`` "settings-content"] [
-            p [attr.``class`` "settings-desc"] [
-                text "Your current dashboard preferences."
-            ]
+        el "div" "settings-content" [
+            elA "p" [attr.``class`` "settings-desc"] [txt "Your current dashboard preferences."]
             state.View |> Doc.BindView (fun s ->
-                div [attr.``class`` "settings-grid"] [
-                    div [attr.``class`` "settings-row"] [
-                        span [attr.``class`` "settings-label"] [text "Default City"]
-                        span [attr.``class`` "settings-value"] [text s.City]
-                    ]
-                    div [attr.``class`` "settings-row"] [
-                        span [attr.``class`` "settings-label"] [text "News Category"]
-                        span [attr.``class`` "settings-value"] [text s.NewsCategory.Label]
-                    ]
-                    div [attr.``class`` "settings-row"] [
-                        span [attr.``class`` "settings-label"] [text "Base Currency"]
-                        span [attr.``class`` "settings-value"] [text s.BaseCurrency]
-                    ]
+                el "div" "settings-grid" [
+                    el "div" "settings-row" [el "span" "settings-label" [txt "Default City"];     el "span" "settings-value" [txt s.City]]
+                    el "div" "settings-row" [el "span" "settings-label" [txt "News Category"];    el "span" "settings-value" [txt s.NewsCategory.Label]]
+                    el "div" "settings-row" [el "span" "settings-label" [txt "Base Currency"];    el "span" "settings-value" [txt s.BaseCurrency]]
                 ])
             saved.View |> Doc.BindView (fun msg ->
                 if msg = "" then Doc.Empty
-                else div [attr.``class`` "settings-saved"] [text msg] :> Doc)
-            button [
+                else el "div" "settings-saved" [txt msg])
+            elA "button" [
                 attr.``class`` "btn-save"
                 on.click (fun _ _ ->
                     let s = state.Value
-                    let cfg = {
-                        DefaultCity     = s.City
-                        DefaultCategory = s.NewsCategory.ApiValue
-                        DefaultCurrency = s.BaseCurrency
-                    }
+                    let cfg = { DefaultCity = s.City; DefaultCategory = s.NewsCategory.ApiValue; DefaultCurrency = s.BaseCurrency }
                     async {
                         do! Server.SaveConfig cfg
                         saved.Value <- "Preferences saved!"
                         do! Async.Sleep 2000
                         saved.Value <- ""
                     } |> Async.Start)
-            ] [text "Save Preferences"]
+            ] [txt "Save Preferences"]
         ]
 
-    // ── TAB TYPE 
+    // ── TAB TYPE ─────────────────────────────────────────────
     type DashTab = WeatherTab | NewsTab | CurrencyTab | SettingsTab
 
-    // ── MAIN APP 
+    // ── RENDER APP ───────────────────────────────────────────
     let renderApp () : Doc =
         let activeTab : Var<DashTab> = Var.Create WeatherTab
 
         let navItem (tab: DashTab) (icon: string) (label: string) : Doc =
             activeTab.View |> Doc.BindView (fun current ->
-                button [
+                elA "button" [
                     attr.``class`` (if current = tab then "nav-btn nav-active" else "nav-btn")
                     on.click (fun _ _ -> activeTab.Value <- tab)
                 ] [
-                    span [attr.``class`` "nav-icon"]  [text icon]
-                    span [attr.``class`` "nav-label"] [text label]
-                ] :> Doc)
+                    el "span" "nav-icon"  [txt icon]
+                    el "span" "nav-label" [txt label]
+                ])
 
         let mainContent : Doc =
             activeTab.View |> Doc.BindView (fun tab ->
                 match tab with
-                | WeatherTab  ->
-                    widgetCard "Weather & Forecast" "🌤"
-                        (fun () -> loadWeather state.Value.City)
-                        (weatherWidget ())
-                | NewsTab     ->
-                    widgetCard "Top Headlines" "📰"
-                        (fun () -> loadNews state.Value.NewsCategory)
-                        (newsWidget ())
-                | CurrencyTab ->
-                    widgetCard "Currency Exchange" "💱"
-                        (fun () -> loadCurrency state.Value.BaseCurrency)
-                        (currencyWidget ())
-                | SettingsTab ->
-                    widgetCard "Settings" "⚙"
-                        (fun () -> ())
-                        (settingsWidget ()))
+                | WeatherTab  -> widgetCard "Weather & Forecast" "🌤" (fun () -> loadWeather state.Value.City)        (weatherWidget ())
+                | NewsTab     -> widgetCard "Top Headlines"      "📰" (fun () -> loadNews state.Value.NewsCategory)   (newsWidget ())
+                | CurrencyTab -> widgetCard "Currency Exchange"  "💱" (fun () -> loadCurrency state.Value.BaseCurrency)(currencyWidget ())
+                | SettingsTab -> widgetCard "Settings"           "⚙"  (fun () -> ())                                  (settingsWidget ()))
 
-        div [attr.``class`` "app-shell"] [
-            nav [attr.``class`` "sidebar"] [
-                div [attr.``class`` "sidebar-brand"] [
-                    div [attr.``class`` "brand-title"] [text "SmartDash"]
-                    div [attr.``class`` "brand-sub"]   [text "Live Dashboard"]
+        el "div" "app-shell" [
+            elA "nav" [attr.``class`` "sidebar"] [
+                el "div" "sidebar-brand" [
+                    el "div" "brand-title" [txt "SmartDash"]
+                    el "div" "brand-sub"   [txt "Live Dashboard"]
                 ]
-                div [attr.``class`` "nav-items"] [
+                el "div" "nav-items" [
                     navItem WeatherTab  "🌤" "Weather"
                     navItem NewsTab     "📰" "News"
                     navItem CurrencyTab "💱" "Currency"
                     navItem SettingsTab "⚙"  "Settings"
                 ]
             ]
-            Doc.Element "main" [attr.``class`` "main-content"] [
-                mainContent
-            ]
+            Doc.Element "main" [attr.``class`` "main-content"] [mainContent]
         ]
 
     [<SPAEntryPoint>]

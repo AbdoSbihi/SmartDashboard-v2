@@ -15,6 +15,8 @@ type Startup(configuration: IConfiguration) =
 
     member _.ConfigureServices(services: IServiceCollection) =
         Server.configure configuration
+        // FIX: use AddSitelet directly on IServiceCollection
+        // This is the confirmed non-deprecated API for WebSharper 10
         services
             .AddSitelet(Site.Main)
             .AddWebSharper()
@@ -24,14 +26,12 @@ type Startup(configuration: IConfiguration) =
     member _.Configure(app: IApplicationBuilder, env: IWebHostEnvironment) =
         if env.IsDevelopment() then
             app.UseDeveloperExceptionPage() |> ignore
-
-        let defaultFiles = DefaultFilesOptions()
-        defaultFiles.DefaultFileNames.Clear()
-        defaultFiles.DefaultFileNames.Add("Main.html")
-        app.UseDefaultFiles(defaultFiles) |> ignore
-        app.UseStaticFiles() |> ignore
-        app.UseWebSharper()  |> ignore
-
+        let df = DefaultFilesOptions()
+        df.DefaultFileNames.Clear()
+        df.DefaultFileNames.Add("Main.html")
+        app.UseDefaultFiles(df) |> ignore
+        app.UseStaticFiles()    |> ignore
+        app.UseWebSharper()     |> ignore
 
 let openBrowser (url: string) =
     try
@@ -44,28 +44,22 @@ let openBrowser (url: string) =
     with ex ->
         printfn "Could not open browser: %s" ex.Message
 
-
 [<EntryPoint>]
 let main argv =
     let port = Environment.GetEnvironmentVariable("PORT")
     let url  =
-        if port <> null then sprintf "http://0.0.0.0:%s" port
+        if port <> null then "http://0.0.0.0:" + port
         else "http://localhost:5000"
-
     let host =
         Host.CreateDefaultBuilder(argv)
             .ConfigureWebHostDefaults(fun webBuilder ->
                 webBuilder.UseStartup<Startup>() |> ignore
-                webBuilder.UseUrls(url) |> ignore
-            )
+                webBuilder.UseUrls(url)           |> ignore)
             .Build()
-
     host.Start()
-
     if port = null then
         Threading.Thread.Sleep(500)
         openBrowser url
-
     printfn "SmartDashboard running at %s" url
     host.WaitForShutdown()
     0
