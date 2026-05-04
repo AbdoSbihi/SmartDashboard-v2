@@ -11,12 +11,12 @@ open WebSharper.UI.Notation
 [<JavaScript>]
 module Client =
 
-    // ── STATE ────────────────────────────────────────────────
+    // ── STATE 
     let state       : Var<AppState> = Var.Create AppState.init
     let cityInput   : Var<string>   = Var.Create "Budapest"
     let amountInput : Var<string>   = Var.Create "1"
 
-    // ── HELPERS ──────────────────────────────────────────────
+    // ── HELPERS 
     let getElementValue (el: Dom.Element) : string =
         JS.Get<string> "value" el
 
@@ -25,17 +25,13 @@ module Client =
     let setNews     n = state.Value <- { state.Value with News     = n }
     let setCurrency c = state.Value <- { state.Value with Currency = c }
 
-    // Using string concat instead of format to avoid float/int tuple confusion
     let weatherIcon (code: string) : string =
         "https://openweathermap.org/img/wn/" + code + "@2x.png"
 
-    // Explicit float param + string concat avoids format string type errors
     let fmtTemp (t: float) : string =
-        let rounded = Math.Round(t, 1)
-        string rounded + "°C"
+        sprintf "%.1f°C" t
 
-    // ── ELEMENT HELPERS ──────────────────────────────────────
-    // These wrap Doc.Element to guarantee Doc return type everywhere
+    // ── ELEMENT HELPERS 
     let el (tag: string) (cls: string) (children: Doc list) : Doc =
         Doc.Element tag [attr.``class`` cls] children
 
@@ -45,7 +41,7 @@ module Client =
     let txt (s: string) : Doc =
         Doc.TextNode s
 
-    // ── LOAD FUNCTIONS ───────────────────────────────────────
+    // ── LOAD FUNCTIONS 
     let loadWeather (city: string) =
         setWeather Fetching
         setForecast Fetching
@@ -87,7 +83,7 @@ module Client =
         loadNews     s.NewsCategory
         loadCurrency s.BaseCurrency
 
-    // ── WIDGET CARD ──────────────────────────────────────────
+    // ── WIDGET CARD 
     let widgetCard (title: string) (icon: string) (onRefresh: unit -> unit) (content: Doc) : Doc =
         el "div" "widget-card" [
             el "div" "widget-header" [
@@ -103,7 +99,7 @@ module Client =
             el "div" "widget-body" [content]
         ]
 
-    // ── WIDGET STATE ─────────────────────────────────────────
+    // ── WIDGET STATE 
     let renderWidgetState (ws: WidgetState<'T>) (render: 'T -> Doc) : Doc =
         match ws with
         | Idle     -> el "div" "widget-idle"    [txt "Click ↻ to load"]
@@ -111,14 +107,14 @@ module Client =
         | Failed e -> el "div" "widget-error"   [txt ("Error: " + e)]
         | Loaded d -> render d
 
-    // ── WEATHER ──────────────────────────────────────────────
+    // ── WEATHER 
     let weatherContent (data: WeatherData) : Doc =
         let temp     : float = data.TempC
         let feels    : float = data.FeelsLike
         let wind     : float = data.WindSpeed
         let humidity : int   = data.Humidity
         let humStr = string humidity + "%"
-        let windStr = string (Math.Round(wind, 1)) + " m/s"
+        let windStr = sprintf "%.1f m/s" wind
         el "div" "weather-main" [
             el "div" "weather-top" [
                 elA "img" [
@@ -178,7 +174,7 @@ module Client =
                 el "div" "weather-results" [wDoc; fDoc])
         ]
 
-    // ── NEWS ─────────────────────────────────────────────────
+    // ── NEWS 
     let newsArticle (a: NewsArticle) : Doc =
         let imgDoc : Doc =
             if a.ImageUrl <> "" then
@@ -214,7 +210,7 @@ module Client =
                     el "div" "news-grid" (articles |> List.map newsArticle)))
         ]
 
-    // ── CURRENCY ─────────────────────────────────────────────
+    // ── CURRENCY 
     let currencyWidget () : Doc =
         let optDocs : Doc list =
             Currency.supported |> List.map (fun (code, name, flag) ->
@@ -253,12 +249,11 @@ module Client =
                 |> List.map (fun r ->
                     let rate : float = r.Rate
                     let prod : float = amountVal * rate
-                    // FIX: bind Math.Round result to avoid (float * int) tuple
-                    let conv : float = Math.Round(prod, 2)
+                    let convStr = sprintf "%.2f" prod
                     elA "tr" [] [
                         elA "td" [] [txt (r.Flag + " " + r.Code)]
                         elA "td" [attr.``class`` "rate-val"]       [txt (sprintf "%.4f" rate)]
-                        elA "td" [attr.``class`` "rate-converted"] [txt (sprintf "%.2f" conv + " " + r.Code)]
+                        elA "td" [attr.``class`` "rate-converted"] [txt (convStr + " " + r.Code)]
                     ])
             el "div" "rates-wrap" [
                 el "div" "currency-updated" [txt ("Updated: " + rates.UpdatedAt)]
@@ -283,7 +278,7 @@ module Client =
                 renderWidgetState s.Currency ratesTable)
         ]
 
-    // ── SETTINGS ─────────────────────────────────────────────
+    // ── SETTINGS 
     let settingsWidget () : Doc =
         let saved = Var.Create ""
         el "div" "settings-content" [
@@ -311,10 +306,10 @@ module Client =
             ] [txt "Save Preferences"]
         ]
 
-    // ── TAB TYPE ─────────────────────────────────────────────
+    // ── TAB TYPE 
     type DashTab = WeatherTab | NewsTab | CurrencyTab | SettingsTab
 
-    // ── RENDER APP ───────────────────────────────────────────
+    // ── RENDER APP 
     let renderApp () : Doc =
         let activeTab : Var<DashTab> = Var.Create WeatherTab
 

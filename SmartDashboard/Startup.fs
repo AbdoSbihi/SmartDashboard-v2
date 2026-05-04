@@ -15,8 +15,6 @@ type Startup(configuration: IConfiguration) =
 
     member _.ConfigureServices(services: IServiceCollection) =
         Server.configure configuration
-        // FIX: use AddSitelet directly on IServiceCollection
-        // This is the confirmed non-deprecated API for WebSharper 10
         services
             .AddSitelet(Site.Main)
             .AddWebSharper()
