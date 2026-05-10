@@ -35,12 +35,13 @@ This project demonstrates advanced F# concepts in a real-world web application a
 
 * Features :
   
-Weather — current conditions + 5-day forecast for any city 
-News — top headlines across 6 categories 
-Currency — live exchange rates for 10 currencies 
-Settings — save preferred city, category, and currency per session
+  - Weather — current conditions + 5-day forecast for any city 
+  - News — top headlines across 6 categories 
+  - Currency — live exchange rates for 10 currencies 
+  - Settings — save preferred city, category, and currency per session
 
 
+------------------------------------------------------------------------------- 2026/05/10 ---------------------------------------------------------------------------------------------------------------------------
 * Additional Features : (v2)
   
    * The dashboard includes four extra features :
@@ -53,6 +54,7 @@ Settings — save preferred city, category, and currency per session
         <img width="1910" height="995" alt="1" src="https://github.com/user-attachments/assets/6cfb406a-f7df-4b5b-b893-b8a4a321c5cc" />
 
 
+------------------------------------------------------------------------------- 2026/05/10 ---------------------------------------------------------------------------------------------------------------------------
 * Tech Stack :
   
 Language: F# (.NET 10)
