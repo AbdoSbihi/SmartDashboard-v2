@@ -368,7 +368,7 @@ module Client =
                     el "span" "settings-label" [txt "Temperature Unit"]
                     el "span" "settings-value" [txt (if c then "Celsius (°C)" else "Fahrenheit (°F)")]
                 ])
-            // Theme preference display
+            // Theme preference displaY
             isDark.View |> Doc.BindView (fun d ->
                 el "div" "settings-row" [
                     el "span" "settings-label" [txt "Theme"]
