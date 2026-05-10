@@ -1,14 +1,46 @@
 import Runtime from "./WebSharper.Core.JavaScript/Runtime.js"
 Runtime.ScriptBasePath="/Scripts/";
-import { Lazy, Create as Create_1, GetOptional, SetOptional } from "./WebSharper.Core.JavaScript/Runtime.js"
+import { Create as Create_1, Lazy, GetOptional, SetOptional } from "./WebSharper.Core.JavaScript/Runtime.js"
 function isIDisposable(x){
   return"Dispose"in x;
 }
 function Main(){
+  applyTheme(true);
+  startClock();
+  startRefreshTimer();
   loadAll();
   const _1=renderApp();
   LoadLocalTemplates("");
   Doc.RunById("main", _1);
+}
+function applyTheme(dark){
+  dark?globalThis.document.body.setAttribute("data-theme", "dark"):globalThis.document.body.setAttribute("data-theme", "light");
+}
+function startClock(){
+  Start(Delay(() => While(() => true, Delay(() => {
+    const now=Date.now();
+    clockTime().Set(DateFormatter(now, "HH:mm:ss"));
+    clockDate().Set(DateFormatter(now, "dddd, MMMM dd yyyy"));
+    return Bind(Sleep(1000), () => Return(null));
+  }))), null);
+}
+function startRefreshTimer(){
+  Start(Delay(() => While(() => true, Delay(() => Bind(Sleep(1000), () => {
+    const c=countdown().Get()-1;
+    if(c<=0){
+      countdown().Set(300);
+      const s=state().Get();
+      setWeather(Fetching);
+      setForecast(Fetching);
+      setNews(Fetching);
+      setCurrency(Fetching);
+      return Bind(GetWeather(s.City), (a) => Combine(a.$==1?(setWeather(Failed(a.$0)),Zero()):(setWeather(Loaded(a.$0)),Zero()), Delay(() => Bind(GetForecast(s.City), (a_1) => Combine(a_1.$==1?(setForecast(Failed(a_1.$0)),Zero()):(setForecast(Loaded(a_1.$0)),Zero()), Delay(() => Bind(GetNews(s.NewsCategory.ApiValue), (a_2) => Combine(a_2.$==1?(setNews(Failed(a_2.$0)),Zero()):(setNews(Loaded(a_2.$0)),Zero()), Delay(() => Bind(GetCurrencyRates(s.BaseCurrency), (a_3) => a_3.$==1?(setCurrency(Failed(a_3.$0)),Zero()):(setCurrency(Loaded(a_3.$0)),Zero())))))))))));
+    }
+    else {
+      countdown().Set(c);
+      return Zero();
+    }
+  })))), null);
 }
 function loadAll(){
   const s=state().Get();
@@ -19,6 +51,12 @@ function loadAll(){
 function renderApp(){
   const activeTab=_c.Create_1(WeatherTab);
   const navItem=(tab, icon, label) => Doc.BindView((current) => elA("button", ofArray([Attr.Create("class", Equals(current, tab)?"nav-btn nav-active":"nav-btn"), Attr.HandlerImpl("click", () =>() => activeTab.Set(tab))]), ofArray([el("span", "nav-icon", ofArray([txt(icon)])), el("span", "nav-label", ofArray([txt(label)]))])), activeTab.View);
+  const themeToggle=Doc.BindView((dark) => elA("button", ofArray([Attr.Create("class", "btn-theme"), Attr.HandlerImpl("click", () =>() => {
+    const next=!isDark().Get();
+    isDark().Set(next);
+    return applyTheme(next);
+  })]), ofArray([txt(dark?"\u2600 Light Mode":"\ud83c\udf19 Dark Mode")])), isDark().View);
+  const refreshDisplay=Doc.BindView((c) => el("div", "refresh-countdown", ofArray([txt(((((_1) =>(_2) =>(_3) => _1("Auto-refresh in "+String(_2)+":"+padNumLeft(String(_3), 2)))((x) => x))(c/60>>0))(c%60))])), countdown().View);
   const mainContent=Doc.BindView((tab) => tab.$==1?widgetCard("Top Headlines", "\ud83d\udcf0", () => {
     loadNews(state().Get().NewsCategory);
   }, newsWidget()):tab.$==2?widgetCard("Currency Exchange", "\ud83d\udcb1", () => {
@@ -26,15 +64,44 @@ function renderApp(){
   }, currencyWidget()):tab.$==3?widgetCard("Settings", "\u2699", () => { }, settingsWidget()):widgetCard("Weather & Forecast", "\ud83c\udf24", () => {
     loadWeather(state().Get().City);
   }, weatherWidget()), activeTab.View);
-  return el("div", "app-shell", ofArray([elA("nav", ofArray([Attr.Create("class", "sidebar")]), ofArray([el("div", "sidebar-brand", ofArray([el("div", "brand-title", ofArray([txt("SmartDash")])), el("div", "brand-sub", ofArray([txt("Live Dashboard")]))])), el("div", "nav-items", ofArray([navItem(WeatherTab, "\ud83c\udf24", "Weather"), navItem(NewsTab, "\ud83d\udcf0", "News"), navItem(CurrencyTab, "\ud83d\udcb1", "Currency"), navItem(SettingsTab, "\u2699", "Settings")]))])), Doc.Element("main", ofArray([Attr.Create("class", "main-content")]), ofArray([mainContent]))]));
+  return el("div", "app-shell", ofArray([elA("nav", ofArray([Attr.Create("class", "sidebar")]), ofArray([el("div", "sidebar-brand", ofArray([el("div", "brand-title", ofArray([txt("SmartDash")])), el("div", "brand-sub", ofArray([txt("Live Dashboard")]))])), clockWidget(), el("div", "nav-items", ofArray([navItem(WeatherTab, "\ud83c\udf24", "Weather"), navItem(NewsTab, "\ud83d\udcf0", "News"), navItem(CurrencyTab, "\ud83d\udcb1", "Currency"), navItem(SettingsTab, "\u2699", "Settings")])), el("div", "sidebar-footer", ofArray([themeToggle, refreshDisplay]))])), Doc.Element("main", ofArray([Attr.Create("class", "main-content")]), ofArray([mainContent]))]));
+}
+function clockTime(){
+  return _c_1.clockTime;
+}
+function clockDate(){
+  return _c_1.clockDate;
+}
+function countdown(){
+  return _c_1.countdown;
 }
 function state(){
   return _c_1.state;
 }
+function setWeather(w){
+  let _1=state();
+  const _2=state().Get();
+  _1.Set(New(w, _2.Forecast, _2.News, _2.Currency, _2.City, _2.NewsCategory, _2.BaseCurrency, _2.Amount));
+}
+function setForecast(f){
+  let _1=state();
+  const _2=state().Get();
+  _1.Set(New(_2.Weather, f, _2.News, _2.Currency, _2.City, _2.NewsCategory, _2.BaseCurrency, _2.Amount));
+}
+function setNews(n){
+  let _1=state();
+  const _2=state().Get();
+  _1.Set(New(_2.Weather, _2.Forecast, n, _2.Currency, _2.City, _2.NewsCategory, _2.BaseCurrency, _2.Amount));
+}
+function setCurrency(c){
+  let _1=state();
+  const _2=state().Get();
+  _1.Set(New(_2.Weather, _2.Forecast, _2.News, c, _2.City, _2.NewsCategory, _2.BaseCurrency, _2.Amount));
+}
 function loadWeather(city){
   setWeather(Fetching);
   setForecast(Fetching);
-  Start(Delay(() => Bind_1(GetWeather(city), (a) => {
+  Start(Delay(() => Bind(GetWeather(city), (a) => {
     if(a.$==1){
       const e=a.$0;
       setWeather(Failed(e));
@@ -43,17 +110,17 @@ function loadWeather(city){
     }
     else {
       setWeather(Loaded(a.$0));
-      return Bind_1(GetForecast(city), (a_1) => a_1.$==1?(setForecast(Failed(a_1.$0)),Zero()):(setForecast(Loaded(a_1.$0)),Zero()));
+      return Bind(GetForecast(city), (a_1) => a_1.$==1?(setForecast(Failed(a_1.$0)),Zero()):(setForecast(Loaded(a_1.$0)),Zero()));
     }
   })), null);
 }
 function loadNews(cat){
   setNews(Fetching);
-  Start(Delay(() => Bind_1(GetNews(cat.ApiValue), (a) => a.$==1?(setNews(Failed(a.$0)),Zero()):(setNews(Loaded(a.$0)),Zero()))), null);
+  Start(Delay(() => Bind(GetNews(cat.ApiValue), (a) => a.$==1?(setNews(Failed(a.$0)),Zero()):(setNews(Loaded(a.$0)),Zero()))), null);
 }
 function loadCurrency(base_){
   setCurrency(Fetching);
-  Start(Delay(() => Bind_1(GetCurrencyRates(base_), (a) => a.$==1?(setCurrency(Failed(a.$0)),Zero()):(setCurrency(Loaded(a.$0)),Zero()))), null);
+  Start(Delay(() => Bind(GetCurrencyRates(base_), (a) => a.$==1?(setCurrency(Failed(a.$0)),Zero()):(setCurrency(Loaded(a.$0)),Zero()))), null);
 }
 function elA(tag, attrs, children){
   return Doc.Element(tag, attrs, children);
@@ -63,6 +130,9 @@ function el(tag, cls, children){
 }
 function txt(s){
   return Doc.TextNode(s);
+}
+function clockWidget(){
+  return el("div", "clock-widget", ofArray([Doc.BindView((t) => el("div", "clock-time", ofArray([txt(t)])), clockTime().View), Doc.BindView((d) => el("div", "clock-date", ofArray([txt(d)])), clockDate().View)]));
 }
 function widgetCard(title, icon, onRefresh, content){
   return el("div", "widget-card", ofArray([el("div", "widget-header", ofArray([el("div", "widget-title", ofArray([el("span", "widget-icon", ofArray([txt(icon)])), txt(title)])), elA("button", ofArray([Attr.Create("class", "btn-refresh"), Attr.HandlerImpl("click", () =>() => onRefresh())]), ofArray([txt("\u21bb")]))])), el("div", "widget-body", ofArray([content]))]));
@@ -104,12 +174,12 @@ function currencyWidget(){
 }
 function settingsWidget(){
   const saved=_c.Create_1("");
-  return el("div", "settings-content", ofArray([elA("p", ofArray([Attr.Create("class", "settings-desc")]), ofArray([txt("Your current dashboard preferences.")])), Doc.BindView((s) => el("div", "settings-grid", ofArray([el("div", "settings-row", ofArray([el("span", "settings-label", ofArray([txt("Default City")])), el("span", "settings-value", ofArray([txt(s.City)]))])), el("div", "settings-row", ofArray([el("span", "settings-label", ofArray([txt("News Category")])), el("span", "settings-value", ofArray([txt(s.NewsCategory.Label)]))])), el("div", "settings-row", ofArray([el("span", "settings-label", ofArray([txt("Base Currency")])), el("span", "settings-value", ofArray([txt(s.BaseCurrency)]))]))])), state().View), Doc.BindView((msg) => msg==""?Doc.Empty:el("div", "settings-saved", ofArray([txt(msg)])), saved.View), elA("button", ofArray([Attr.Create("class", "btn-save"), Attr.HandlerImpl("click", () =>() => {
+  return el("div", "settings-content", ofArray([elA("p", ofArray([Attr.Create("class", "settings-desc")]), ofArray([txt("Your current dashboard preferences.")])), Doc.BindView((s) => el("div", "settings-grid", ofArray([el("div", "settings-row", ofArray([el("span", "settings-label", ofArray([txt("Default City")])), el("span", "settings-value", ofArray([txt(s.City)]))])), el("div", "settings-row", ofArray([el("span", "settings-label", ofArray([txt("News Category")])), el("span", "settings-value", ofArray([txt(s.NewsCategory.Label)]))])), el("div", "settings-row", ofArray([el("span", "settings-label", ofArray([txt("Base Currency")])), el("span", "settings-value", ofArray([txt(s.BaseCurrency)]))]))])), state().View), Doc.BindView((c) => el("div", "settings-row", ofArray([el("span", "settings-label", ofArray([txt("Temperature Unit")])), el("span", "settings-value", ofArray([txt(c?"Celsius (°C)":"Fahrenheit (°F)")]))])), isCelsius().View), Doc.BindView((d) => el("div", "settings-row", ofArray([el("span", "settings-label", ofArray([txt("Theme")])), el("span", "settings-value", ofArray([txt(d?"Dark":"Light")]))])), isDark().View), Doc.BindView((msg) => msg==""?Doc.Empty:el("div", "settings-saved", ofArray([txt(msg)])), saved.View), elA("button", ofArray([Attr.Create("class", "btn-save"), Attr.HandlerImpl("click", () =>() => {
     const s=state().Get();
     const cfg=New_1(s.City, s.NewsCategory.ApiValue, s.BaseCurrency);
-    return Start(Delay(() => Bind_1(SaveConfig(cfg), () => {
+    return Start(Delay(() => Bind(SaveConfig(cfg), () => {
       saved.Set("Preferences saved!");
-      return Bind_1(Sleep(2000), () => {
+      return Bind(Sleep(2000), () => {
         saved.Set("");
         return Zero();
       });
@@ -117,7 +187,7 @@ function settingsWidget(){
   })]), ofArray([txt("Save Preferences")]))]));
 }
 function weatherWidget(){
-  return el("div", "weather-widget", ofArray([el("div", "search-bar", ofArray([Doc.Input([Attr.Create("class", "search-input"), Attr.Create("placeholder", "Search city\u2026")], cityInput()), elA("button", ofArray([Attr.Create("class", "btn-search"), Attr.HandlerImpl("click", () =>() => {
+  return el("div", "weather-widget", ofArray([el("div", "weather-controls", ofArray([el("div", "search-bar", ofArray([Doc.Input([Attr.Create("class", "search-input"), Attr.Create("placeholder", "Search city\u2026")], cityInput()), elA("button", ofArray([Attr.Create("class", "btn-search"), Attr.HandlerImpl("click", () =>() => {
     const city=Trim(cityInput().Get());
     if(city!=""){
       let _1=state();
@@ -126,7 +196,7 @@ function weatherWidget(){
       return loadWeather(city);
     }
     else return null;
-  })]), ofArray([txt("Search")]))])), Doc.BindView((s) => {
+  })]), ofArray([txt("Search")]))])), Doc.BindView((c) => elA("button", ofArray([Attr.Create("class", "btn-unit"), Attr.HandlerImpl("click", () =>() => isCelsius().Set(!isCelsius().Get()))]), ofArray([txt(c?"Switch to °F":"Switch to °C")])), isCelsius().View)])), Doc.BindView((s) => {
     let _1=renderWidgetState(s.Weather, weatherContent);
     const m=s.Forecast;
     let _2=m.$==2?forecastContent(m.$0):Doc.Empty;
@@ -135,25 +205,8 @@ function weatherWidget(){
     return el("div", "weather-results", _4);
   }, state().View)]));
 }
-function setWeather(w){
-  let _1=state();
-  const _2=state().Get();
-  _1.Set(New(w, _2.Forecast, _2.News, _2.Currency, _2.City, _2.NewsCategory, _2.BaseCurrency, _2.Amount));
-}
-function setForecast(f){
-  let _1=state();
-  const _2=state().Get();
-  _1.Set(New(_2.Weather, f, _2.News, _2.Currency, _2.City, _2.NewsCategory, _2.BaseCurrency, _2.Amount));
-}
-function setNews(n){
-  let _1=state();
-  const _2=state().Get();
-  _1.Set(New(_2.Weather, _2.Forecast, n, _2.Currency, _2.City, _2.NewsCategory, _2.BaseCurrency, _2.Amount));
-}
-function setCurrency(c){
-  let _1=state();
-  const _2=state().Get();
-  _1.Set(New(_2.Weather, _2.Forecast, _2.News, c, _2.City, _2.NewsCategory, _2.BaseCurrency, _2.Amount));
+function isDark(){
+  return _c_1.isDark;
 }
 function renderWidgetState(ws, render){
   return ws.$==1?el("div", "widget-loading", ofArray([el("div", "spinner", FSharpList.Empty), txt("Loading\u2026")])):ws.$==3?el("div", "widget-error", ofArray([txt("Error: "+ws.$0)])):ws.$==2?render(ws.$0):el("div", "widget-idle", ofArray([txt("Click \u21bb to load")]));
@@ -168,12 +221,18 @@ function amountInput(){
 function getElementValue(el_1){
   return el_1.value;
 }
+function isCelsius(){
+  return _c_1.isCelsius;
+}
 function forecastContent(days){
-  return el("div", "forecast-row", map((d) => el("div", "forecast-day", ofArray([el("div", "forecast-date", ofArray([txt(d.Date)])), elA("img", ofArray([Attr.Create("src", weatherIcon(d.Icon)), Attr.Create("class", "forecast-icon"), Attr.Create("alt", d.Desc)]), FSharpList.Empty), el("div", "forecast-temps", ofArray([el("span", "temp-max", ofArray([txt(fmtTemp(d.TempMax))])), el("span", "temp-min", ofArray([txt(fmtTemp(d.TempMin))]))]))])), days));
+  return Doc.BindView(() => el("div", "forecast-row", map((d) => el("div", "forecast-day", ofArray([el("div", "forecast-date", ofArray([txt(d.Date)])), elA("img", ofArray([Attr.Create("src", weatherIcon(d.Icon)), Attr.Create("class", "forecast-icon"), Attr.Create("alt", d.Desc)]), FSharpList.Empty), el("div", "forecast-temps", ofArray([el("span", "temp-max", ofArray([txt(fmtTemp(d.TempMax))])), el("span", "temp-min", ofArray([txt(fmtTemp(d.TempMin))]))]))])), days)), isCelsius().View);
 }
 function weatherContent(data){
+  const temp=data.TempC;
+  const feels=data.FeelsLike;
+  const humStr=String(data.Humidity)+"%";
   const windStr=(((_1) =>(_2) => _1(_2.toFixed(1)+" m/s"))((x) => x))(data.WindSpeed);
-  return el("div", "weather-main", ofArray([el("div", "weather-top", ofArray([elA("img", ofArray([Attr.Create("src", weatherIcon(data.Condition.Icon)), Attr.Create("class", "weather-icon-img"), Attr.Create("alt", data.Condition.Description)]), FSharpList.Empty), el("div", "weather-info", ofArray([el("div", "weather-temp", ofArray([txt(fmtTemp(data.TempC))])), el("div", "weather-city", ofArray([txt(data.City+", "+data.Country)])), el("div", "weather-desc", ofArray([txt(data.Condition.Description)]))]))])), el("div", "weather-details", ofArray([el("div", "weather-detail", ofArray([el("span", "detail-label", ofArray([txt("Feels like")])), el("span", "detail-value", ofArray([txt(fmtTemp(data.FeelsLike))]))])), el("div", "weather-detail", ofArray([el("span", "detail-label", ofArray([txt("Humidity")])), el("span", "detail-value", ofArray([txt(String(data.Humidity)+"%")]))])), el("div", "weather-detail", ofArray([el("span", "detail-label", ofArray([txt("Wind")])), el("span", "detail-value", ofArray([txt(windStr)]))]))]))]));
+  return Doc.BindView(() => el("div", "weather-main", ofArray([el("div", "weather-top", ofArray([elA("img", ofArray([Attr.Create("src", weatherIcon(data.Condition.Icon)), Attr.Create("class", "weather-icon-img"), Attr.Create("alt", data.Condition.Description)]), FSharpList.Empty), el("div", "weather-info", ofArray([el("div", "weather-temp", ofArray([txt(fmtTemp(temp))])), el("div", "weather-city", ofArray([txt(data.City+", "+data.Country)])), el("div", "weather-desc", ofArray([txt(data.Condition.Description)]))]))])), el("div", "weather-details", ofArray([el("div", "weather-detail", ofArray([el("span", "detail-label", ofArray([txt("Feels like")])), el("span", "detail-value", ofArray([txt(fmtTemp(feels))]))])), el("div", "weather-detail", ofArray([el("span", "detail-label", ofArray([txt("Humidity")])), el("span", "detail-value", ofArray([txt(humStr)]))])), el("div", "weather-detail", ofArray([el("span", "detail-label", ofArray([txt("Wind")])), el("span", "detail-value", ofArray([txt(windStr)]))]))]))])), isCelsius().View);
 }
 function cityInput(){
   return _c_1.cityInput;
@@ -181,18 +240,31 @@ function cityInput(){
 function weatherIcon(code){
   return"https://openweathermap.org/img/wn/"+code+"@2x.png";
 }
-function fmtTemp(t){
-  return(((_1) =>(_2) => _1(_2.toFixed(1)+"°C"))((x) => x))(t);
+function fmtTemp(tempC){
+  return isCelsius().Get()?(((_1) =>(_2) => _1(_2.toFixed(1)+"°C"))((x) => x))(tempC):(((_1) =>(_2) => _1(_2.toFixed(1)+"°F"))((x) => x))(tempC*9/5+32);
 }
 function FailWith(msg){
   throw new Error(msg);
 }
+function toInt(x){
+  const u=toUInt(x);
+  return u>2147483647?u-4294967296:u;
+}
 function KeyValue(kvp){
   return[kvp.K, kvp.V];
+}
+function toUInt(x){
+  return(x<0?Math.ceil(x):Math.floor(x))>>>0;
 }
 function range(min, max_1){
   const count=1+max_1-min;
   return count<=0?[]:init_2(count, (x) => x+min);
+}
+function GetFieldValues(o){
+  let r=[];
+  let k;
+  for(var k_1 in o)r.push(o[k_1]);
+  return r;
 }
 class Object_1 {
   Equals(obj){
@@ -203,6 +275,29 @@ class Object_1 {
   }
 }
 class Var extends Object_1 { }
+let Fetching={$:1};
+function Failed(Item){
+  return{$:3, $0:Item};
+}
+function Loaded(Item){
+  return{$:2, $0:Item};
+}
+let Idle={$:0};
+function GetWeather(city){
+  return Bind((new AjaxRemotingProvider()).Async("Server/GetWeather", [city]), (o) => Return((DecodeJson_FSharpResult_5())(o)));
+}
+function GetForecast(city){
+  return Bind((new AjaxRemotingProvider()).Async("Server/GetForecast", [city]), (o) => Return((DecodeJson_FSharpResult_4())(o)));
+}
+function GetNews(category){
+  return Bind((new AjaxRemotingProvider()).Async("Server/GetNews", [category]), (o) => Return((DecodeJson_FSharpResult_3())(o)));
+}
+function GetCurrencyRates(baseCurrency){
+  return Bind((new AjaxRemotingProvider()).Async("Server/GetCurrencyRates", [baseCurrency]), (o) => Return((DecodeJson_FSharpResult_2())(o)));
+}
+function SaveConfig(cfg){
+  return(new AjaxRemotingProvider()).Async("Server/SaveConfig", [cfg]);
+}
 function New(Weather, Forecast, News, Currency, City, NewsCategory_1, BaseCurrency, Amount){
   return{
     Weather:Weather, 
@@ -214,6 +309,21 @@ function New(Weather, Forecast, News, Currency, City, NewsCategory_1, BaseCurren
     BaseCurrency:BaseCurrency, 
     Amount:Amount
   };
+}
+class NewsCategory {
+  get ApiValue(){
+    return this.$==1?"technology":this.$==2?"science":this.$==3?"sports":this.$==4?"business":this.$==5?"health":"general";
+  }
+  get Label(){
+    return this.$==1?"Technology":this.$==2?"Science":this.$==3?"Sports":this.$==4?"Business":this.$==5?"Health":"General";
+  }
+  static General=Create_1(NewsCategory, {$:0});
+  static Technology=Create_1(NewsCategory, {$:1});
+  static Science=Create_1(NewsCategory, {$:2});
+  static Sports=Create_1(NewsCategory, {$:3});
+  static Business=Create_1(NewsCategory, {$:4});
+  static Health=Create_1(NewsCategory, {$:5});
+  $;
 }
 let _c=Lazy((_i) => class Var_1 extends Object_1 {
   static {
@@ -473,7 +583,7 @@ class Doc extends Object_1 {
   }
   static EmbedView(view){
     const node=CreateEmbedNode();
-    return Doc.Mk(EmbedDoc(node), Map_1(() => { }, Bind((doc) => {
+    return Doc.Mk(EmbedDoc(node), Map_1(() => { }, Bind_1((doc) => {
       UpdateEmbedNode(node, doc.docNode);
       return doc.updates;
     }, view)));
@@ -503,15 +613,19 @@ class Doc extends Object_1 {
     this.updates=updates;
   }
 }
+function padNumLeft(s, l){
+  const f=get(s, 0);
+  return f==" "||f=="+"||f=="-"?f+PadLeftWith(s.substr(1), l-1, "0"):PadLeftWith(s, l, "0");
+}
 function LoadLocalTemplates(baseName){
   !LocalTemplatesLoaded()?(set_LocalTemplatesLoaded(true),LoadNestedTemplates(globalThis.document.body, "")):void 0;
   LoadedTemplates().set_Item(baseName, LoadedTemplateFile(""));
 }
 function LocalTemplatesLoaded(){
-  return _c_3.LocalTemplatesLoaded;
+  return _c_4.LocalTemplatesLoaded;
 }
 function set_LocalTemplatesLoaded(_1){
-  _c_3.LocalTemplatesLoaded=_1;
+  _c_4.LocalTemplatesLoaded=_1;
 }
 function LoadNestedTemplates(root, baseName){
   const loadedTpls=LoadedTemplateFile(baseName);
@@ -559,7 +673,7 @@ function LoadNestedTemplates(root, baseName){
     prepareTemplate(head_1(rawTpls.Keys));
 }
 function LoadedTemplates(){
-  return _c_3.LoadedTemplates;
+  return _c_4.LoadedTemplates;
 }
 function LoadedTemplateFile(name){
   let o;
@@ -790,7 +904,7 @@ function PrepareSingleTemplate(baseName, name, el_1){
   };
 }
 function TextHoleRE(){
-  return _c_3.TextHoleRE;
+  return _c_4.TextHoleRE;
 }
 function NewFromSeq(fields){
   const r={};
@@ -808,10 +922,380 @@ function NewFromSeq(fields){
   }
   return r;
 }
+function Delay(mk){
+  return(c) => {
+    try {
+      (mk())(c);
+    }
+    catch(e){
+      c.k(No(e));
+    }
+  };
+}
+function While(g, c){
+  return g()?Bind(c, () => While(g, c)):Return();
+}
+function Bind(r, f){
+  return checkCancel((c) => {
+    r(New_2((a) => {
+      if(a.$==0){
+        const x=a.$0;
+        scheduler().Fork(() => {
+          try {
+            (f(x))(c);
+          }
+          catch(e){
+            c.k(No(e));
+          }
+        });
+      }
+      else scheduler().Fork(() => {
+        c.k(a);
+      });
+    }, c.ct));
+  });
+}
+function Sleep(ms){
+  return(c) => {
+    let pending;
+    let creg;
+    pending=void 0;
+    creg=void 0;
+    pending=setTimeout(() => {
+      creg.Dispose();
+      scheduler().Fork(() => {
+        c.k(Ok(null));
+      });
+    }, ms);
+    creg=Register(c.ct, () => {
+      clearTimeout(pending);
+      scheduler().Fork(() => {
+        cancel(c);
+      });
+    });
+  };
+}
+function Return(x){
+  return(c) => {
+    c.k(Ok(x));
+  };
+}
+function Start(c, ctOpt){
+  const d=(defCTS())[0];
+  const ct=ctOpt==null?d:ctOpt.$0;
+  scheduler().Fork(() => {
+    if(!ct.c)c(New_2((a) => {
+      if(a.$==1)UncaughtAsyncError(a.$0);
+    }, ct));
+  });
+}
+function Combine(a, b){
+  return Bind(a, () => b);
+}
+function Zero(){
+  return _c_2.Zero;
+}
+function checkCancel(r){
+  return(c) => {
+    if(c.ct.c)cancel(c);
+    else r(c);
+  };
+}
+function Register(ct, callback){
+  if(ct===noneCT())return{Dispose(){
+    return null;
+  }};
+  else {
+    const i=ct.r.push(callback)-1;
+    return{Dispose(){
+      return set(ct.r, i, () => { });
+    }};
+  }
+}
+function cancel(c){
+  c.k(Cc(new OperationCanceledException("New", c.ct)));
+}
+function defCTS(){
+  return _c_2.defCTS;
+}
+function UncaughtAsyncError(e){
+  console.log("WebSharper: Uncaught asynchronous exception", e);
+}
+function scheduler(){
+  return _c_2.scheduler;
+}
+function noneCT(){
+  return _c_2.noneCT;
+}
+function GetCT(){
+  return _c_2.GetCT;
+}
+function FromContinuations(subscribe){
+  return(c) => {
+    const continued=[false];
+    const once=(cont) => {
+      if(continued[0])FailWith("A continuation provided by Async.FromContinuations was invoked multiple times");
+      else {
+        continued[0]=true;
+        scheduler().Fork(cont);
+      }
+    };
+    subscribe((a) => {
+      once(() => {
+        c.k(Ok(a));
+      });
+    }, (e) => {
+      once(() => {
+        c.k(No(e));
+      });
+    }, (e) => {
+      once(() => {
+        c.k(Cc(e));
+      });
+    });
+  };
+}
+function DateFormatter(date, format){
+  const d=new Date(date);
+  switch(format){
+    case"D":
+      return String(longDays().get_Item(d.getDay()))+", "+padLeft(2, String(d.getDate()))+" "+String(longMonths().get_Item(d.getMonth()))+" "+String(d.getFullYear());
+    case"d":
+      return padLeft(2, String(d.getMonth()+1))+"/"+padLeft(2, String(d.getDate()))+"/"+String(d.getFullYear());
+    case"T":
+      return padLeft(2, String(d.getHours()))+":"+padLeft(2, String(d.getMinutes()))+":"+padLeft(2, String(d.getSeconds()));
+    case"t":
+      return padLeft(2, String(d.getHours()))+":"+padLeft(2, String(d.getMinutes()));
+    case"o":
+    case"O":
+      return String(d.getFullYear())+"-"+padLeft(2, String(d.getMonth()+1))+"-"+padLeft(2, String(d.getDate()))+"T"+padLeft(2, String(d.getHours()))+":"+padLeft(2, String(d.getMinutes()))+":"+padLeft(2, String(d.getSeconds()))+"."+padLeft(3, String(d.getMilliseconds()))+dateOffsetString(d);
+    default:
+      return dateToStringWithCustomFormat(d, format);
+  }
+}
+function longDays(){
+  return _c_5.longDays;
+}
+function padLeft(minLength, x){
+  return x.length<minLength?replicate(minLength-x.length, "0")+x:x;
+}
+function longMonths(){
+  return _c_5.longMonths;
+}
+function dateOffsetString(d){
+  const offset=d.getTimezoneOffset()*-60000;
+  const offset_1=Math.abs(offset);
+  return(offset<0?"-":"+")+padLeft(2, String(toInt(offset_1/3600000)))+":"+padLeft(2, String(toInt(offset_1%3600000/60000)));
+}
+function dateToStringWithCustomFormat(d, format){
+  let cursorPos=0;
+  let tokenLength=0;
+  let result="";
+  const appendToResult=(s) => {
+    result=result+s;
+  };
+  while(cursorPos<format.length)
+    ((() => {
+      const token=format[cursorPos];
+      switch(token){
+        case"d":
+          tokenLength=parseRepeatToken(format, cursorPos, "d");
+          cursorPos=cursorPos+tokenLength;
+          switch(tokenLength){
+            case 1:
+              return appendToResult(String(d.getDate()));
+            case 2:
+              return appendToResult(padLeft(2, String(d.getDate())));
+            case 3:
+              return appendToResult(String(shortDays().get_Item(d.getDay())));
+            default:
+            case 4:
+              return appendToResult(String(longDays().get_Item(d.getDay())));
+          }
+          break;
+        case"f":
+          tokenLength=parseRepeatToken(format, cursorPos, "f");
+          cursorPos=cursorPos+tokenLength;
+          switch(tokenLength){
+            case 3:
+            case 2:
+            case 1:
+              const precision=toInt(10**(3-tokenLength));
+              return appendToResult(padLeft(tokenLength, String(d.getMilliseconds()/precision>>0)));
+            case 7:
+            case 6:
+            case 5:
+            case 4:
+              return appendToResult(padRight(tokenLength, String(d.getMilliseconds())));
+            default:
+              return FailWith("Input string was not in a correct format.");
+          }
+          break;
+        case"F":
+          tokenLength=parseRepeatToken(format, cursorPos, "F");
+          cursorPos=cursorPos+tokenLength;
+          switch(tokenLength){
+            case 3:
+            case 2:
+            case 1:
+              const precision_1=toInt(10**(3-tokenLength));
+              const value=d.getMilliseconds()/precision_1>>0;
+              return value!==0?appendToResult(padLeft(tokenLength, String(value))):null;
+            case 7:
+            case 6:
+            case 5:
+            case 4:
+              const value_1=d.getMilliseconds();
+              return value_1!==0?appendToResult(padLeft(3, String(value_1))):null;
+            default:
+              return FailWith("Input string was not in a correct format.");
+          }
+          break;
+        case"g":
+          tokenLength=parseRepeatToken(format, cursorPos, "g");
+          cursorPos=cursorPos+tokenLength;
+          return appendToResult("A.D.");
+        case"h":
+          tokenLength=parseRepeatToken(format, cursorPos, "h");
+          cursorPos=cursorPos+tokenLength;
+          const hours=d.getHours()%12;
+          return appendToResult(tokenLength===1||tokenLength===2&&false?hours===0?"12":String(hours):hours===0?"12":padLeft(2, String(hours)));
+        case"H":
+          tokenLength=parseRepeatToken(format, cursorPos, "H");
+          cursorPos=cursorPos+tokenLength;
+          return appendToResult(tokenLength===1||tokenLength===2&&false?String(d.getHours()):padLeft(2, String(d.getHours())));
+        case"K":
+          tokenLength=parseRepeatToken(format, cursorPos, "K");
+          cursorPos=cursorPos+tokenLength;
+          return appendToResult(replicate(tokenLength, dateOffsetString(d)));
+        case"m":
+          tokenLength=parseRepeatToken(format, cursorPos, "m");
+          cursorPos=cursorPos+tokenLength;
+          return appendToResult(tokenLength===1||tokenLength===2&&false?String(d.getMinutes()):padLeft(2, String(d.getMinutes())));
+        case"M":
+          let _1;
+          tokenLength=parseRepeatToken(format, cursorPos, "M");
+          cursorPos=cursorPos+tokenLength;
+          switch(tokenLength){
+            case 1:
+              _1=String(d.getMonth()+1);
+              break;
+            case 2:
+              _1=padLeft(2, String(d.getMonth()+1));
+              break;
+            case 3:
+              _1=String(shortMonths().get_Item(d.getMonth()));
+              break;
+            default:
+            case 4:
+              _1=String(longMonths().get_Item(d.getMonth()));
+              break;
+          }
+          return appendToResult(_1);
+        case"s":
+          tokenLength=parseRepeatToken(format, cursorPos, "s");
+          cursorPos=cursorPos+tokenLength;
+          return appendToResult(tokenLength===1||tokenLength===2&&false?String(d.getSeconds()):padLeft(2, String(d.getSeconds())));
+        case"t":
+          tokenLength=parseRepeatToken(format, cursorPos, "t");
+          cursorPos=cursorPos+tokenLength;
+          return appendToResult(tokenLength===1||tokenLength===2&&false?d.getHours()<12?"A":"P":d.getHours()<12?"AM":"PM");
+        case"y":
+          tokenLength=parseRepeatToken(format, cursorPos, "y");
+          cursorPos=cursorPos+tokenLength;
+          return appendToResult(tokenLength===1?String(d.getFullYear()%100):tokenLength===2?padLeft(2, String(d.getFullYear()%100)):padLeft(tokenLength, String(d.getFullYear())));
+        case"z":
+          tokenLength=parseRepeatToken(format, cursorPos, "z");
+          cursorPos=cursorPos+tokenLength;
+          const utcOffsetText=dateOffsetString(d);
+          const sign=Substring(utcOffsetText, 0, 1);
+          const hours_1=Substring(utcOffsetText, 1, 2);
+          const minutes=Substring(utcOffsetText, 4, 2);
+          return appendToResult(tokenLength===1?sign+(StartsWith(hours_1, "0")?hours_1.substring(1):hours_1):tokenLength===2?sign+hours_1:sign+hours_1+":"+minutes);
+        case":":
+          cursorPos=cursorPos+1;
+          return appendToResult(":");
+        case"/":
+          cursorPos=cursorPos+1;
+          return appendToResult("/");
+        case"'":
+        case"\"":
+          const p=parseQuotedString(format, cursorPos);
+          cursorPos=cursorPos+p[1];
+          return appendToResult(p[0]);
+        case"%":
+          const nextChar=parseNextChar(format, cursorPos);
+          return nextChar!=null&&nextChar.$0!=="%"?(cursorPos=cursorPos+2,appendToResult(dateToStringWithCustomFormat(d, nextChar.$0))):FailWith("Invalid format string");
+        case"\\":
+          const m=parseNextChar(format, cursorPos);
+          if(m==null)return FailWith("Invalid format string");
+          else {
+            const nextChar2=m.$0;
+            cursorPos=cursorPos+2;
+            return appendToResult(nextChar2);
+          }
+          break;
+        default:
+          appendToResult(token);
+          {
+            cursorPos=cursorPos+1;
+            return;
+          }
+          break;
+      }
+    })());
+  return result;
+}
+function parseRepeatToken(format, pos, patternChar){
+  let tokenLength=0;
+  let internalPos=pos;
+  while(internalPos<format.length&&format[internalPos]===patternChar)
+    {
+      internalPos=internalPos+1;
+      tokenLength=tokenLength+1;
+    }
+  return tokenLength;
+}
+function shortDays(){
+  return _c_5.shortDays;
+}
+function padRight(minLength, x){
+  return x.length<minLength?x+replicate(minLength-x.length, "0"):x;
+}
+function shortMonths(){
+  return _c_5.shortMonths;
+}
+function parseQuotedString(format, pos){
+  const quoteChar=format[pos];
+  let result="";
+  let foundQuote=false;
+  let pos_1=pos;
+  let earlyBreak=false;
+  while(pos_1<format.length&&!earlyBreak)
+    {
+      pos_1=pos_1+1;
+      const currentChar=format[pos_1];
+      if(currentChar===quoteChar){
+        foundQuote=true;
+        earlyBreak=true;
+      }
+      else currentChar==="\\"?pos_1<format.length?(pos_1=pos_1+1,result=result+format[pos_1]):FailWith("Invalid string format"):result=result+currentChar;
+    }
+  if(!foundQuote)FailWith("Invalid string format could not find matching quote for "+String(quoteChar));
+  return[result, pos_1-pos+1];
+}
+function parseNextChar(format, pos){
+  return pos>=format.length-1?null:Some(format[pos+1]);
+}
 let _c_1=Lazy((_i) => class $StartupCode_Client {
   static {
     _c_1=_i(this);
   }
+  static countdown;
+  static clockDate;
+  static clockTime;
+  static isCelsius;
+  static isDark;
   static amountInput;
   static cityInput;
   static state;
@@ -819,30 +1303,75 @@ let _c_1=Lazy((_i) => class $StartupCode_Client {
     this.state=_c.Create_1(init_1());
     this.cityInput=_c.Create_1("Budapest");
     this.amountInput=_c.Create_1("1");
+    this.isDark=_c.Create_1(true);
+    this.isCelsius=_c.Create_1(true);
+    this.clockTime=_c.Create_1("");
+    this.clockDate=_c.Create_1("");
+    this.countdown=_c.Create_1(300);
   }
 });
-let Fetching={$:1};
-function Failed(Item){
-  return{$:3, $0:Item};
+class AjaxRemotingProvider extends Object_1 {
+  AsyncBase(m, data){
+    return Delay(() => {
+      const headers=makeHeaders(this.Headers);
+      const payload=makePayload(data);
+      return Bind(GetCT(), (a) => Bind(FromContinuations((ok, err, cc) => {
+        const waiting=[true];
+        const reg=Register(a, () => {
+          if(waiting[0]){
+            waiting[0]=false;
+            cc(new OperationCanceledException("New", a));
+          }
+        });
+        return AjaxProvider().Async(this.EndPoint+"/"+m, headers, payload, (x) => {
+          if(waiting[0]){
+            waiting[0]=false;
+            reg.Dispose();
+            ok(x);
+          }
+        }, (e) => {
+          if(waiting[0]){
+            waiting[0]=false;
+            reg.Dispose();
+            err(e);
+          }
+        });
+      }), (a_1) => Return(JSON.parse(a_1))));
+    });
+  }
+  get EndPoint(){
+    return EndPoint();
+  }
+  get Headers(){
+    return[];
+  }
+  Async(m, data){
+    return this.AsyncBase(m, data);
+  }
 }
-function Loaded(Item){
-  return{$:2, $0:Item};
+let Decoder_CurrencyRates;
+let Decoder_FSharpResult_2;
+let Decoder_FSharpResult_3;
+let Decoder_FSharpResult_4;
+let Decoder_WeatherData;
+let Decoder_FSharpResult_5;
+function DecodeJson_FSharpResult_5(){
+  return Decoder_FSharpResult_5?Decoder_FSharpResult_5:Decoder_FSharpResult_5=(DecodeUnion(void 0, "$", [[0, [["$0", "ResultValue", DecodeJson_WeatherData, 0]]], [1, [["$0", "ErrorValue", Id(), 0]]]]))();
 }
-let Idle={$:0};
-function GetWeather(city){
-  return Bind_1((new AjaxRemotingProvider()).Async("Server/GetWeather", [city]), (o) => Return((DecodeJson_FSharpResult_5())(o)));
+function DecodeJson_FSharpResult_4(){
+  return Decoder_FSharpResult_4?Decoder_FSharpResult_4:Decoder_FSharpResult_4=(DecodeUnion(void 0, "$", [[0, [["$0", "ResultValue", DecodeList(Id()), 0]]], [1, [["$0", "ErrorValue", Id(), 0]]]]))();
 }
-function GetForecast(city){
-  return Bind_1((new AjaxRemotingProvider()).Async("Server/GetForecast", [city]), (o) => Return((DecodeJson_FSharpResult_4())(o)));
+function DecodeJson_FSharpResult_3(){
+  return Decoder_FSharpResult_3?Decoder_FSharpResult_3:Decoder_FSharpResult_3=(DecodeUnion(void 0, "$", [[0, [["$0", "ResultValue", DecodeList(Id()), 0]]], [1, [["$0", "ErrorValue", Id(), 0]]]]))();
 }
-function GetNews(category){
-  return Bind_1((new AjaxRemotingProvider()).Async("Server/GetNews", [category]), (o) => Return((DecodeJson_FSharpResult_3())(o)));
+function DecodeJson_FSharpResult_2(){
+  return Decoder_FSharpResult_2?Decoder_FSharpResult_2:Decoder_FSharpResult_2=(DecodeUnion(void 0, "$", [[0, [["$0", "ResultValue", DecodeJson_CurrencyRates, 0]]], [1, [["$0", "ErrorValue", Id(), 0]]]]))();
 }
-function GetCurrencyRates(baseCurrency){
-  return Bind_1((new AjaxRemotingProvider()).Async("Server/GetCurrencyRates", [baseCurrency]), (o) => Return((DecodeJson_FSharpResult_2())(o)));
+function DecodeJson_WeatherData(){
+  return Decoder_WeatherData?Decoder_WeatherData:Decoder_WeatherData=(DecodeRecord(void 0, [["City", Id(), 0], ["Country", Id(), 0], ["TempC", Id(), 0], ["FeelsLike", Id(), 0], ["Humidity", Id(), 0], ["WindSpeed", Id(), 0], ["Condition", Id(), 0], ["FetchedAt", DecodeDateTime(), 0]]))();
 }
-function SaveConfig(cfg){
-  return(new AjaxRemotingProvider()).Async("Server/SaveConfig", [cfg]);
+function DecodeJson_CurrencyRates(){
+  return Decoder_CurrencyRates?Decoder_CurrencyRates:Decoder_CurrencyRates=(DecodeRecord(void 0, [["Base", Id(), 0], ["Rates", DecodeList(Id()), 0], ["UpdatedAt", Id(), 0]]))();
 }
 class FSharpList {
   static Empty=Create_1(FSharpList, {$:0});
@@ -852,6 +1381,9 @@ class FSharpList {
       $0:Head, 
       $1:Tail
     });
+  }
+  get_Item(x){
+    return nth(x, this);
   }
   GetEnumerator(){
     return new T(this, null, (e) => {
@@ -869,21 +1401,6 @@ class FSharpList {
   $0;
   $1;
 }
-class NewsCategory {
-  get ApiValue(){
-    return this.$==1?"technology":this.$==2?"science":this.$==3?"sports":this.$==4?"business":this.$==5?"health":"general";
-  }
-  get Label(){
-    return this.$==1?"Technology":this.$==2?"Science":this.$==3?"Sports":this.$==4?"Business":this.$==5?"Health":"General";
-  }
-  static General=Create_1(NewsCategory, {$:0});
-  static Technology=Create_1(NewsCategory, {$:1});
-  static Science=Create_1(NewsCategory, {$:2});
-  static Sports=Create_1(NewsCategory, {$:3});
-  static Business=Create_1(NewsCategory, {$:4});
-  static Health=Create_1(NewsCategory, {$:5});
-  $;
-}
 class ConcreteVar extends Var {
   isConst;
   current;
@@ -892,9 +1409,6 @@ class ConcreteVar extends Var {
   id;
   get View(){
     return this.view;
-  }
-  Get(){
-    return this.current;
   }
   Set(v){
     if(this.isConst)(((_1) => _1("WebSharper.UI: invalid attempt to change value of a Var after calling SetFinal"))((s) => {
@@ -905,6 +1419,9 @@ class ConcreteVar extends Var {
       this.current=v;
       this.snap={s:Ready(v, [])};
     }
+  }
+  Get(){
+    return this.current;
   }
   UpdateMaybe(f){
     const m=f(this.Get());
@@ -1144,12 +1661,6 @@ class Attr {
   $0;
   $1;
 }
-function GetFieldValues(o){
-  let r=[];
-  let k;
-  for(var k_1 in o)r.push(o[k_1]);
-  return r;
-}
 function ParseHTMLIntoFakeRoot(elem){
   const root=globalThis.document.createElement("div");
   if(!rhtml().test(elem)){
@@ -1180,19 +1691,19 @@ function ParseHTMLIntoFakeRoot(elem){
   }
 }
 function rhtml(){
-  return _c_8.rhtml;
+  return _c_9.rhtml;
 }
 function wrapMap(){
-  return _c_8.wrapMap;
+  return _c_9.wrapMap;
 }
 function defaultWrap(){
-  return _c_8.defaultWrap;
+  return _c_9.defaultWrap;
 }
 function rxhtmlTag(){
-  return _c_8.rxhtmlTag;
+  return _c_9.rxhtmlTag;
 }
 function rtagName(){
-  return _c_8.rtagName;
+  return _c_9.rtagName;
 }
 function IterSelector(el_1, selector, f){
   const l=el_1.querySelectorAll(selector);
@@ -1212,7 +1723,7 @@ function RemoveNode(parent, el_1){
   if(el_1.parentNode===parent)parent.removeChild(el_1);
 }
 function all(){
-  return _c_2.all;
+  return _c_3.all;
 }
 function Map2_1(fn, a, a_1){
   return CreateLazy(() => Map2(fn, a(), a_1()));
@@ -1241,7 +1752,7 @@ function CreateLazy(observe){
     else return c;
   };
 }
-function Bind(fn, view){
+function Bind_1(fn, view){
   return Join_1(Map_1(fn, view));
 }
 function Map2Unit_1(a, a_1){
@@ -1259,7 +1770,7 @@ function Join_1(a){
   return CreateLazy(() => Join(a()));
 }
 function supported(){
-  return _c_2.supported;
+  return _c_3.supported;
 }
 function New_1(DefaultCity, DefaultCategory, DefaultCurrency){
   return{
@@ -1366,211 +1877,113 @@ class Dictionary extends Object_1 {
     }
   }
 }
-function init_1(){
-  return _c_2.init;
+function New_2(k, ct){
+  return{k:k, ct:ct};
 }
-function Delay(mk){
-  return(c) => {
-    try {
-      (mk())(c);
-    }
-    catch(e){
-      c.k(No(e));
-    }
-  };
+function No(Item){
+  return{$:1, $0:Item};
 }
-function Bind_1(r, f){
-  return checkCancel((c) => {
-    r(New_2((a) => {
-      if(a.$==0){
-        const x=a.$0;
-        scheduler().Fork(() => {
-          try {
-            (f(x))(c);
-          }
-          catch(e){
-            c.k(No(e));
-          }
-        });
-      }
-      else scheduler().Fork(() => {
-        c.k(a);
-      });
-    }, c.ct));
-  });
+function Ok(Item){
+  return{$:0, $0:Item};
 }
-function Zero(){
-  return _c_4.Zero;
-}
-function Start(c, ctOpt){
-  const d=(defCTS())[0];
-  const ct=ctOpt==null?d:ctOpt.$0;
-  scheduler().Fork(() => {
-    if(!ct.c)c(New_2((a) => {
-      if(a.$==1)UncaughtAsyncError(a.$0);
-    }, ct));
-  });
-}
-function Sleep(ms){
-  return(c) => {
-    let pending;
-    let creg;
-    pending=void 0;
-    creg=void 0;
-    pending=setTimeout(() => {
-      creg.Dispose();
-      scheduler().Fork(() => {
-        c.k(Ok(null));
-      });
-    }, ms);
-    creg=Register(c.ct, () => {
-      clearTimeout(pending);
-      scheduler().Fork(() => {
-        cancel(c);
-      });
-    });
-  };
-}
-function checkCancel(r){
-  return(c) => {
-    if(c.ct.c)cancel(c);
-    else r(c);
-  };
-}
-function defCTS(){
-  return _c_4.defCTS;
-}
-function UncaughtAsyncError(e){
-  console.log("WebSharper: Uncaught asynchronous exception", e);
-}
-function Register(ct, callback){
-  if(ct===noneCT())return{Dispose(){
-    return null;
-  }};
-  else {
-    const i=ct.r.push(callback)-1;
-    return{Dispose(){
-      return set(ct.r, i, () => { });
-    }};
-  }
-}
-function cancel(c){
-  c.k(Cc(new OperationCanceledException("New", c.ct)));
-}
-function scheduler(){
-  return _c_4.scheduler;
-}
-function Return(x){
-  return(c) => {
-    c.k(Ok(x));
-  };
-}
-function noneCT(){
-  return _c_4.noneCT;
-}
-function FromContinuations(subscribe){
-  return(c) => {
-    const continued=[false];
-    const once=(cont) => {
-      if(continued[0])FailWith("A continuation provided by Async.FromContinuations was invoked multiple times");
-      else {
-        continued[0]=true;
-        scheduler().Fork(cont);
-      }
-    };
-    subscribe((a) => {
-      once(() => {
-        c.k(Ok(a));
-      });
-    }, (e) => {
-      once(() => {
-        c.k(No(e));
-      });
-    }, (e) => {
-      once(() => {
-        c.k(Cc(e));
-      });
-    });
-  };
-}
-function GetCT(){
-  return _c_4.GetCT;
-}
-class AjaxRemotingProvider extends Object_1 {
-  AsyncBase(m, data){
-    return Delay(() => {
-      const headers=makeHeaders(this.Headers);
-      const payload=makePayload(data);
-      return Bind_1(GetCT(), (a) => Bind_1(FromContinuations((ok, err, cc) => {
-        const waiting=[true];
-        const reg=Register(a, () => {
-          if(waiting[0]){
-            waiting[0]=false;
-            cc(new OperationCanceledException("New", a));
-          }
-        });
-        return AjaxProvider().Async(this.EndPoint+"/"+m, headers, payload, (x) => {
-          if(waiting[0]){
-            waiting[0]=false;
-            reg.Dispose();
-            ok(x);
-          }
-        }, (e) => {
-          if(waiting[0]){
-            waiting[0]=false;
-            reg.Dispose();
-            err(e);
-          }
-        });
-      }), (a_1) => Return(JSON.parse(a_1))));
-    });
-  }
-  get EndPoint(){
-    return EndPoint();
-  }
-  get Headers(){
-    return[];
-  }
-  Async(m, data){
-    return this.AsyncBase(m, data);
-  }
-}
-let Decoder_CurrencyRates;
-let Decoder_FSharpResult_2;
-let Decoder_FSharpResult_3;
-let Decoder_FSharpResult_4;
-let Decoder_WeatherData;
-let Decoder_FSharpResult_5;
-function DecodeJson_FSharpResult_5(){
-  return Decoder_FSharpResult_5?Decoder_FSharpResult_5:Decoder_FSharpResult_5=(DecodeUnion(void 0, "$", [[0, [["$0", "ResultValue", DecodeJson_WeatherData, 0]]], [1, [["$0", "ErrorValue", Id(), 0]]]]))();
-}
-function DecodeJson_FSharpResult_4(){
-  return Decoder_FSharpResult_4?Decoder_FSharpResult_4:Decoder_FSharpResult_4=(DecodeUnion(void 0, "$", [[0, [["$0", "ResultValue", DecodeList(Id()), 0]]], [1, [["$0", "ErrorValue", Id(), 0]]]]))();
-}
-function DecodeJson_FSharpResult_3(){
-  return Decoder_FSharpResult_3?Decoder_FSharpResult_3:Decoder_FSharpResult_3=(DecodeUnion(void 0, "$", [[0, [["$0", "ResultValue", DecodeList(Id()), 0]]], [1, [["$0", "ErrorValue", Id(), 0]]]]))();
-}
-function DecodeJson_FSharpResult_2(){
-  return Decoder_FSharpResult_2?Decoder_FSharpResult_2:Decoder_FSharpResult_2=(DecodeUnion(void 0, "$", [[0, [["$0", "ResultValue", DecodeJson_CurrencyRates, 0]]], [1, [["$0", "ErrorValue", Id(), 0]]]]))();
-}
-function DecodeJson_WeatherData(){
-  return Decoder_WeatherData?Decoder_WeatherData:Decoder_WeatherData=(DecodeRecord(void 0, [["City", Id(), 0], ["Country", Id(), 0], ["TempC", Id(), 0], ["FeelsLike", Id(), 0], ["Humidity", Id(), 0], ["WindSpeed", Id(), 0], ["Condition", Id(), 0], ["FetchedAt", DecodeDateTime(), 0]]))();
-}
-function DecodeJson_CurrencyRates(){
-  return Decoder_CurrencyRates?Decoder_CurrencyRates:Decoder_CurrencyRates=(DecodeRecord(void 0, [["Base", Id(), 0], ["Rates", DecodeList(Id()), 0], ["UpdatedAt", Id(), 0]]))();
+function Cc(Item){
+  return{$:2, $0:Item};
 }
 function TryParse(s, r){
   return TryParse_2(s, -2147483648, 2147483647, r);
 }
+function init_1(){
+  return _c_3.init;
+}
+function New_3(IsCancellationRequested, Registrations){
+  return{c:IsCancellationRequested, r:Registrations};
+}
+function DecodeUnion(t, discr, cases){
+  return() =>(x) => {
+    let tag;
+    if(typeof x==="object"&&x!=null){
+      const o={};
+      if(typeof discr==="string"){
+        const tagName=x[discr];
+        tag=findIndex((case_1) =>!Equals(case_1, null)&&case_1[0]==tagName, cases);
+      }
+      else {
+        const r=[void 0];
+        let k;
+        for(var k_1 in discr)if(((k_2) => x.hasOwnProperty(k_2)&&(r[0]=discr[k_2],true))(k_1))break;
+        tag=r[0];
+      }
+      o.$=tag;
+      iter_1((_1) => {
+        const from=_1[0];
+        const __to__=_1[1];
+        const dec=_1[2];
+        const kind=_1[3];
+        if(from==null){
+          const r_1=(dec())(x);
+          if(__to__)delete r_1[discr];
+          o.$0=r_1;
+          return;
+        }
+        else return kind===0?void(o[from]=(dec())(x[__to__])):kind===1?void(o[from]=x.hasOwnProperty(__to__)?Some((dec())(x[__to__])):null):FailWith("Invalid field option kind");
+      }, (get(cases, tag))[1]);
+      return t===void 0?o:t(o);
+    }
+    else return x;
+  };
+}
+function Id(){
+  return() =>(x) => x;
+}
+function DecodeList(decEl){
+  return() =>(a) => {
+    const e=decEl();
+    return init(length(a), (i) => e(get(a, i)));
+  };
+}
+function DecodeRecord(t, fields){
+  return() =>(x) => {
+    const o={};
+    iter_1((_1) => {
+      const name=_1[0];
+      const dec=_1[1];
+      const kind=_1[2];
+      return kind===0?x.hasOwnProperty(name)?void(o[name]=(dec())(x[name])):FailWith("Missing mandatory field: "+name):kind===1?void(o[name]=x.hasOwnProperty(name)?Some((dec())(x[name])):null):kind===2?x.hasOwnProperty(name)?void(o[name]=(dec())(x[name])):null:kind===3?x[name]===void 0?void(o[name]=(dec())(x[name])):null:FailWith("Invalid field option kind");
+    }, fields);
+    return t===void 0?o:t(o);
+  };
+}
+function DecodeDateTime(){
+  return() =>(x) => x.hasOwnProperty("d")?(new Date(x.d)).getTime():(new Date(x)).getTime();
+}
+let _c_2=Lazy((_i) => class $StartupCode_Concurrency {
+  static {
+    _c_2=_i(this);
+  }
+  static GetCT;
+  static Zero;
+  static defCTS;
+  static scheduler;
+  static noneCT;
+  static {
+    this.noneCT=New_3(false, []);
+    this.scheduler=new Scheduler();
+    this.defCTS=[new CancellationTokenSource()];
+    this.Zero=Return();
+    this.GetCT=(c) => {
+      c.k(Ok(c.ct));
+    };
+  }
+});
 function Int(){
   set_counter(counter()+1);
   return counter();
 }
 function set_counter(_1){
-  _c_5.counter=_1;
+  _c_6.counter=_1;
 }
 function counter(){
-  return _c_5.counter;
+  return _c_6.counter;
 }
 function Ready(Item1, Item2){
   return{
@@ -1602,7 +2015,7 @@ function AppendTree(a, b){
   }
 }
 function EmptyAttr(){
-  return _c_6.EmptyAttr;
+  return _c_7.EmptyAttr;
 }
 function Insert(elem, tree){
   const nodes=[];
@@ -1759,9 +2172,9 @@ function MapTreeReduce(mapping, defaultValue, reduction, array){
   }
   return(loop(0))(l);
 }
-let _c_2=Lazy((_i) => class $StartupCode_Model {
+let _c_3=Lazy((_i) => class $StartupCode_Model {
   static {
-    _c_2=_i(this);
+    _c_3=_i(this);
   }
   static defaultConfig;
   static init;
@@ -1779,14 +2192,23 @@ let _c_2=Lazy((_i) => class $StartupCode_Model {
 function Trim(s){
   return s.replace(new RegExp("^\\s+"), "").replace(new RegExp("\\s+$"), "");
 }
+function PadLeftWith(s, n, c){
+  return n>s.length?Array(n-s.length+1).join(c)+s:s;
+}
+function replicate(count, s){
+  return create(count, s).join("");
+}
+function Substring(s, ix, ct){
+  return s.substr(ix, ct);
+}
+function StartsWith(t, s){
+  return t.substring(0, s.length)==s;
+}
 function concat(separator, strings){
   return ofSeq(strings).join(separator);
 }
 function SplitChars(s, sep, opts){
   return Split(s, new RegExp("["+RegexEscape(sep.join(""))+"]"), opts);
-}
-function StartsWith(t, s){
-  return t.substring(0, s.length)==s;
 }
 function Split(s, pat, opts){
   return opts===1?filter_1((x) => x!=="", SplitWith(s, pat)):SplitWith(s, pat);
@@ -1803,9 +2225,9 @@ function SplitWith(str, pat){
 function protect(s){
   return s==null?"":s;
 }
-let _c_3=Lazy((_i) => class $StartupCode_Templates {
+let _c_4=Lazy((_i) => class $StartupCode_Templates {
   static {
-    _c_3=_i(this);
+    _c_4=_i(this);
   }
   static RenderedFullDocTemplate;
   static TextHoleRE;
@@ -1974,6 +2396,23 @@ function fold(f, x, s){
     if(typeof _1=="object"&&isIDisposable(_1))e.Dispose();
   }
 }
+function nth(index, s){
+  if(index<0)FailWith("negative index requested");
+  let pos=-1;
+  const e=Get(s);
+  try {
+    while(pos<index)
+      {
+        !e.MoveNext()?insufficient():void 0;
+        pos=pos+1;
+      }
+    return e.Current;
+  }
+  finally {
+    const _1=e;
+    if(typeof _1=="object"&&isIDisposable(_1))e.Dispose();
+  }
+}
 function iter(p, s){
   const e=Get(s);
   try {
@@ -2038,6 +2477,29 @@ function concat_1(ss){
 function init_2(n, f){
   return take(n, initInfinite(f));
 }
+function distinctBy(f, s){
+  return{GetEnumerator:() => {
+    const o=Get(s);
+    const seen=new HashSet("New_3");
+    return new T(null, null, (e) => {
+      let cur;
+      let has;
+      if(o.MoveNext()){
+        cur=o.Current;
+        has=seen.SAdd(f(cur));
+        while(!has&&o.MoveNext())
+          {
+            cur=o.Current;
+            has=seen.SAdd(f(cur));
+          }
+        return has&&(e.c=cur,true);
+      }
+      else return false;
+    }, () => {
+      o.Dispose();
+    });
+  }};
+}
 function take(n, s){
   n<0?nonNegative():void 0;
   return{GetEnumerator:() => {
@@ -2081,29 +2543,6 @@ function max(s){
     const _1=e;
     if(typeof _1=="object"&&isIDisposable(_1))e.Dispose();
   }
-}
-function distinctBy(f, s){
-  return{GetEnumerator:() => {
-    const o=Get(s);
-    const seen=new HashSet("New_3");
-    return new T(null, null, (e) => {
-      let cur;
-      let has;
-      if(o.MoveNext()){
-        cur=o.Current;
-        has=seen.SAdd(f(cur));
-        while(!has&&o.MoveNext())
-          {
-            cur=o.Current;
-            has=seen.SAdd(f(cur));
-          }
-        return has&&(e.c=cur,true);
-      }
-      else return false;
-    }, () => {
-      o.Dispose();
-    });
-  }};
 }
 function exists(p, s){
   const e=Get(s);
@@ -2166,7 +2605,7 @@ function PerformAnimatedUpdate(childrenOnly, st, doc){
     const cur=FindAll(doc);
     const change=ComputeChangeAnim(st, cur);
     const enter=ComputeEnterAnim(st, cur);
-    return Bind_1(Play(Append(change, ComputeExitAnim(st, cur))), () => Bind_1(SyncElemNodesNextFrame(childrenOnly, st), () => Bind_1(Play(enter), () => {
+    return Bind(Play(Append(change, ComputeExitAnim(st, cur))), () => Bind(SyncElemNodesNextFrame(childrenOnly, st), () => Bind(Play(enter), () => {
       st.PreviousNodes=cur;
       return Return(null);
     })));
@@ -2318,112 +2757,78 @@ function DoSyncElement(el_1){
   let _2=m!=null&&m.$==1?m.$0[1]:null;
   ins(_1, _2);
 }
-function New_2(k, ct){
-  return{k:k, ct:ct};
-}
-function No(Item){
-  return{$:1, $0:Item};
-}
-function Ok(Item){
-  return{$:0, $0:Item};
-}
-function Cc(Item){
-  return{$:2, $0:Item};
-}
-function DecodeUnion(t, discr, cases){
-  return() =>(x) => {
-    let tag;
-    if(typeof x==="object"&&x!=null){
-      const o={};
-      if(typeof discr==="string"){
-        const tagName=x[discr];
-        tag=findIndex((case_1) =>!Equals(case_1, null)&&case_1[0]==tagName, cases);
-      }
-      else {
-        const r=[void 0];
-        let k;
-        for(var k_1 in discr)if(((k_2) => x.hasOwnProperty(k_2)&&(r[0]=discr[k_2],true))(k_1))break;
-        tag=r[0];
-      }
-      o.$=tag;
-      iter_1((_1) => {
-        const from=_1[0];
-        const __to__=_1[1];
-        const dec=_1[2];
-        const kind=_1[3];
-        if(from==null){
-          const r_1=(dec())(x);
-          if(__to__)delete r_1[discr];
-          o.$0=r_1;
-          return;
-        }
-        else return kind===0?void(o[from]=(dec())(x[__to__])):kind===1?void(o[from]=x.hasOwnProperty(__to__)?Some((dec())(x[__to__])):null):FailWith("Invalid field option kind");
-      }, (get(cases, tag))[1]);
-      return t===void 0?o:t(o);
-    }
-    else return x;
-  };
-}
-function Id(){
-  return() =>(x) => x;
-}
-function DecodeList(decEl){
-  return() =>(a) => {
-    const e=decEl();
-    return init(length(a), (i) => e(get(a, i)));
-  };
-}
-function DecodeRecord(t, fields){
-  return() =>(x) => {
-    const o={};
-    iter_1((_1) => {
-      const name=_1[0];
-      const dec=_1[1];
-      const kind=_1[2];
-      return kind===0?x.hasOwnProperty(name)?void(o[name]=(dec())(x[name])):FailWith("Missing mandatory field: "+name):kind===1?void(o[name]=x.hasOwnProperty(name)?Some((dec())(x[name])):null):kind===2?x.hasOwnProperty(name)?void(o[name]=(dec())(x[name])):null:kind===3?x[name]===void 0?void(o[name]=(dec())(x[name])):null:FailWith("Invalid field option kind");
-    }, fields);
-    return t===void 0?o:t(o);
-  };
-}
-function DecodeDateTime(){
-  return() =>(x) => x.hasOwnProperty("d")?(new Date(x.d)).getTime():(new Date(x)).getTime();
-}
-let _c_4=Lazy((_i) => class $StartupCode_Concurrency {
+let _c_5=Lazy((_i) => class Pervasives {
   static {
-    _c_4=_i(this);
+    _c_5=_i(this);
   }
-  static GetCT;
-  static Zero;
-  static defCTS;
-  static scheduler;
-  static noneCT;
+  static longMonths;
+  static shortMonths;
+  static longDays;
+  static shortDays;
   static {
-    this.noneCT=New_3(false, []);
-    this.scheduler=new Scheduler();
-    this.defCTS=[new CancellationTokenSource()];
-    this.Zero=Return();
-    this.GetCT=(c) => {
-      c.k(Ok(c.ct));
-    };
+    this.shortDays=ofArray(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+    this.longDays=ofArray(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]);
+    this.shortMonths=ofArray(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]);
+    this.longMonths=ofArray(["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]);
   }
 });
-function New_3(IsCancellationRequested, Registrations){
-  return{c:IsCancellationRequested, r:Registrations};
+class Scheduler extends Object_1 {
+  idle;
+  robin;
+  Fork(action){
+    this.robin.push(action);
+    this.idle?(this.idle=false,setTimeout(() => {
+      this.tick();
+    }, 0)):void 0;
+  }
+  tick(){
+    const t=Date.now();
+    let loop=true;
+    while(loop)
+      if(this.robin.length===0){
+        this.idle=true;
+        loop=false;
+      }
+      else {
+        (this.robin.shift())();
+        Date.now()-t>40?(setTimeout(() => {
+          this.tick();
+        }, 0),loop=false):void 0;
+      }
+  }
+  constructor(){
+    super();
+    this.idle=true;
+    this.robin=[];
+  }
 }
-function Obsolete(sn){
-  let _1;
-  const m=sn.s;
-  if(m==null||(m!=null&&m.$==2?(_1=m.$1,false):m!=null&&m.$==3?(_1=m.$1,false):true))void 0;
-  else {
-    sn.s=null;
-    for(let i=0, _2=length(_1)-1;i<=_2;i++){
-      const o=get(_1, i);
-      if(typeof o=="object")(((sn_1) => {
-        Obsolete(sn_1);
-      })(o));
-      else o();
+class OperationCanceledException extends Error {
+  ct;
+  constructor(i, _1, _2, _3){
+    let ct;
+    if(i=="New"){
+      ct=_1;
+      i="New_1";
+      _1="The operation was canceled.";
+      _2=null;
+      _3=ct;
+    }
+    if(i=="New_1"){
+      const message=_1;
+      const inner=_2;
+      const ct_1=_3;
+      super(message);
+      this.inner=inner;
+      this.ct=ct_1;
     }
   }
+}
+function findIndex(f, arr){
+  const m=tryFindIndex(f, arr);
+  return m==null?FailWith("KeyNotFoundException"):m.$0;
+}
+function iter_1(f, arr){
+  for(let i=0, _1=arr.length-1;i<=_1;i++)f(arr[i]);
 }
 function ofList(xs){
   const q=[];
@@ -2465,12 +2870,17 @@ function tryFindIndex(f, arr){
     }
   return res;
 }
-function findIndex(f, arr){
-  const m=tryFindIndex(f, arr);
-  return m==null?FailWith("KeyNotFoundException"):m.$0;
+function create(size, value){
+  const r=new Array(size);
+  for(let i=0, _1=size-1;i<=_1;i++)r[i]=value;
+  return r;
 }
-function iter_1(f, arr){
-  for(let i=0, _1=arr.length-1;i<=_1;i++)f(arr[i]);
+function init_3(size, f){
+  if(size<0)FailWith("Negative size given.");
+  else null;
+  const r=new Array(size);
+  for(let i=0, _1=size-1;i<=_1;i++)r[i]=f(i);
+  return r;
 }
 function filter_1(f, arr){
   const r=[];
@@ -2488,16 +2898,12 @@ function foldBack(f, arr, zero){
   for(let i=1, _1=len;i<=_1;i++)acc=f(arr[len-i], acc);
   return acc;
 }
-function init_3(size, f){
-  if(size<0)FailWith("Negative size given.");
-  else null;
-  const r=new Array(size);
-  for(let i=0, _1=size-1;i<=_1;i++)r[i]=f(i);
-  return r;
-}
 function pick(f, arr){
   const m=tryPick(f, arr);
   return m==null?FailWith("KeyNotFoundException"):m.$0;
+}
+function distinctBy_1(f, a){
+  return ofSeq(distinctBy(f, a));
 }
 function concat_2(xs){
   return Array.prototype.concat.apply([], ofSeq(xs));
@@ -2528,14 +2934,6 @@ function choose(f, arr){
   }
   return q;
 }
-function distinctBy_1(f, a){
-  return ofSeq(distinctBy(f, a));
-}
-function create(size, value){
-  const r=new Array(size);
-  for(let i=0, _1=size-1;i<=_1;i++)r[i]=value;
-  return r;
-}
 function forall_2(f, x){
   let a=true;
   let i=0;
@@ -2544,6 +2942,34 @@ function forall_2(f, x){
     if(f(x[i]))i=i+1;
     else a=false;
   return a;
+}
+class CancellationTokenSource extends Object_1 {
+  init;
+  c;
+  pending;
+  r;
+  constructor(){
+    super();
+    this.c=false;
+    this.pending=null;
+    this.r=[];
+    this.init=1;
+  }
+}
+function Obsolete(sn){
+  let _1;
+  const m=sn.s;
+  if(m==null||(m!=null&&m.$==2?(_1=m.$1,false):m!=null&&m.$==3?(_1=m.$1,false):true))void 0;
+  else {
+    sn.s=null;
+    for(let i=0, _2=length(_1)-1;i<=_2;i++){
+      const o=get(_1, i);
+      if(typeof o=="object")(((sn_1) => {
+        Obsolete(sn_1);
+      })(o));
+      else o();
+    }
+  }
 }
 class DocElemNode {
   Attr;
@@ -2816,7 +3242,7 @@ function get_UseAnimations(){
   return UseAnimations();
 }
 function Play(anim){
-  return Delay(() => Bind_1(Run(() => { }, Actions(anim)), () => {
+  return Delay(() => Bind(Run(() => { }, Actions(anim)), () => {
     Finalize(anim);
     return Return(null);
   }));
@@ -2856,12 +3282,12 @@ function get_Empty(){
   return Anim(Empty());
 }
 function BatchUpdatesEnabled(){
-  return _c_7.BatchUpdatesEnabled;
+  return _c_8.BatchUpdatesEnabled;
 }
 function StartProcessor(procAsync){
   const st=[0];
   function work(){
-    return Delay(() => Bind_1(procAsync, () => {
+    return Delay(() => Bind(procAsync, () => {
       const m=st[0];
       return Equals(m, 1)?(st[0]=0,Zero()):Equals(m, 2)?(st[0]=1,work()):Zero();
     }));
@@ -2875,52 +3301,9 @@ function StartProcessor(procAsync){
     else Equals(m, 1)?st[0]=2:void 0;
   };
 }
-class Scheduler extends Object_1 {
-  idle;
-  robin;
-  Fork(action){
-    this.robin.push(action);
-    this.idle?(this.idle=false,setTimeout(() => {
-      this.tick();
-    }, 0)):void 0;
-  }
-  tick(){
-    const t=Date.now();
-    let loop=true;
-    while(loop)
-      if(this.robin.length===0){
-        this.idle=true;
-        loop=false;
-      }
-      else {
-        (this.robin.shift())();
-        Date.now()-t>40?(setTimeout(() => {
-          this.tick();
-        }, 0),loop=false):void 0;
-      }
-  }
-  constructor(){
-    super();
-    this.idle=true;
-    this.robin=[];
-  }
-}
-class CancellationTokenSource extends Object_1 {
-  init;
-  c;
-  pending;
-  r;
-  constructor(){
-    super();
-    this.c=false;
-    this.pending=null;
-    this.r=[];
-    this.init=1;
-  }
-}
-let _c_5=Lazy((_i) => class $StartupCode_Abbrev {
+let _c_6=Lazy((_i) => class $StartupCode_Abbrev {
   static {
-    _c_5=_i(this);
+    _c_6=_i(this);
   }
   static counter;
   static {
@@ -2936,9 +3319,9 @@ function New_4(DynElem, DynFlags, DynNodes, OnAfterRender){
   SetOptional(_1, "OnAfterRender", OnAfterRender);
   return _1;
 }
-let _c_6=Lazy((_i) => class Client {
+let _c_7=Lazy((_i) => class Client {
   static {
-    _c_6=_i(this);
+    _c_7=_i(this);
   }
   static FloatApplyChecked;
   static FloatGetChecked;
@@ -3092,6 +3475,9 @@ class T extends Object_1 {
   n;
   d;
   e;
+  Dispose(){
+    if(this.d)this.d(this);
+  }
   MoveNext(){
     const m=this.n(this);
     this.e=m?1:2;
@@ -3099,9 +3485,6 @@ class T extends Object_1 {
   }
   get Current(){
     return this.e===1?this.c:this.e===0?FailWith("Enumeration has not started. Call MoveNext."):FailWith("Enumeration already finished.");
-  }
-  Dispose(){
-    if(this.d)this.d(this);
   }
   constructor(s, c, n, d){
     super();
@@ -3113,7 +3496,7 @@ class T extends Object_1 {
   }
 }
 function StringApply(){
-  return _c_6.StringApply;
+  return _c_7.StringApply;
 }
 function ApplyValue(get_1, set_1, var_1){
   let expectedValue;
@@ -3138,22 +3521,22 @@ function ApplyValue(get_1, set_1, var_1){
   }, var_1.View)];
 }
 function StringSet(){
-  return _c_6.StringSet;
+  return _c_7.StringSet;
 }
 function StringGet(){
-  return _c_6.StringGet;
+  return _c_7.StringGet;
 }
 function StringListSet(){
-  return _c_6.StringListSet;
+  return _c_7.StringListSet;
 }
 function StringListGet(){
-  return _c_6.StringListGet;
+  return _c_7.StringListGet;
 }
 function DateTimeSetUnchecked(){
-  return _c_6.DateTimeSetUnchecked;
+  return _c_7.DateTimeSetUnchecked;
 }
 function DateTimeGetUnchecked(){
-  return _c_6.DateTimeGetUnchecked;
+  return _c_7.DateTimeGetUnchecked;
 }
 function FileApplyValue(get_1, set_1, var_1){
   let expectedValue;
@@ -3175,55 +3558,34 @@ function FileApplyValue(get_1, set_1, var_1){
   }, var_1.View)];
 }
 function FileSetUnchecked(){
-  return _c_6.FileSetUnchecked;
+  return _c_7.FileSetUnchecked;
 }
 function FileGetUnchecked(){
-  return _c_6.FileGetUnchecked;
+  return _c_7.FileGetUnchecked;
 }
 function IntSetUnchecked(){
-  return _c_6.IntSetUnchecked;
+  return _c_7.IntSetUnchecked;
 }
 function IntGetUnchecked(){
-  return _c_6.IntGetUnchecked;
+  return _c_7.IntGetUnchecked;
 }
 function IntSetChecked(){
-  return _c_6.IntSetChecked;
+  return _c_7.IntSetChecked;
 }
 function IntGetChecked(){
-  return _c_6.IntGetChecked;
+  return _c_7.IntGetChecked;
 }
 function FloatSetUnchecked(){
-  return _c_6.FloatSetUnchecked;
+  return _c_7.FloatSetUnchecked;
 }
 function FloatGetUnchecked(){
-  return _c_6.FloatGetUnchecked;
+  return _c_7.FloatGetUnchecked;
 }
 function FloatSetChecked(){
-  return _c_6.FloatSetChecked;
+  return _c_7.FloatSetChecked;
 }
 function FloatGetChecked(){
-  return _c_6.FloatGetChecked;
-}
-class OperationCanceledException extends Error {
-  ct;
-  constructor(i, _1, _2, _3){
-    let ct;
-    if(i=="New"){
-      ct=_1;
-      i="New_1";
-      _1="The operation was canceled.";
-      _2=null;
-      _3=ct;
-    }
-    if(i=="New_1"){
-      const message=_1;
-      const inner=_2;
-      const ct_1=_3;
-      super(message);
-      this.inner=inner;
-      this.ct=ct_1;
-    }
-  }
+  return _c_7.FloatGetChecked;
 }
 function New_5(PreviousNodes, Top){
   return{PreviousNodes:PreviousNodes, Top:Top};
@@ -3292,7 +3654,7 @@ function Intersect(a, a_1){
   return NodeSet(Intersect_1(a.$0, a_1.$0));
 }
 function UseAnimations(){
-  return _c_9.UseAnimations;
+  return _c_10.UseAnimations;
 }
 function Actions(a){
   return ConcatActions(choose((a_1) => a_1.$==1?Some(a_1.$0):null, ToArray_1(a.$0)));
@@ -3332,15 +3694,49 @@ function Prolong(nextDuration, anim){
   const last=Create(() => anim.Compute(anim.Duration));
   return{Compute:(t) => t>=dur?last.f():comp(t), Duration:nextDuration};
 }
-let _c_7=Lazy((_i) => class Proxy {
+let _c_8=Lazy((_i) => class Proxy {
   static {
-    _c_7=_i(this);
+    _c_8=_i(this);
   }
   static BatchUpdatesEnabled;
   static {
     this.BatchUpdatesEnabled=true;
   }
 });
+function AjaxProvider(){
+  return _c_11.AjaxProvider;
+}
+function makePayload(data){
+  return JSON.stringify(data);
+}
+function makeHeaders(headers){
+  return NewFromSeq(map_2((_1) =>[_1[0], _1[1]], distinctBy_1((t) => t[0], headers.concat([["content-type", "application/json"]]))));
+}
+function EndPoint(){
+  return _c_11.EndPoint;
+}
+function ajax(async, url, headers, data, ok, err, csrf){
+  let xhr=new XMLHttpRequest();
+  let csrf_1=document.cookie.replace(new RegExp("(?:(?:^|.*;)\\s*csrftoken\\s*\\=\\s*([^;]*).*$)|^.*$"), "$1");
+  xhr.open("POST", url, async);
+  if(async==true)xhr.withCredentials=true;
+  let h;
+  for(var h_1 in headers)xhr.setRequestHeader(h_1, headers[h_1]);
+  if(csrf_1)xhr.setRequestHeader("x-csrftoken", csrf_1);
+  function k(){
+    if(xhr.status==200)ok(xhr.responseText);
+    else if(csrf&&xhr.status==403&&xhr.responseText=="CSRF")csrf();
+    else {
+      let msg="Response status is not 200: ";
+      err(new Error(msg+xhr.status));
+    }
+  }
+  if("onload"in xhr)xhr.onload=xhr.onerror=xhr.onabort=k;
+  else xhr.onreadystatechange=() => {
+    if(xhr.readyState==4)k();
+  };
+  xhr.send(data);
+}
 function isBlank(s){
   return forall(IsWhiteSpace, s);
 }
@@ -3365,9 +3761,9 @@ class CheckedInput {
   $0;
   $1;
 }
-let _c_8=Lazy((_i) => class $StartupCode_DomUtility {
+let _c_9=Lazy((_i) => class $StartupCode_DomUtility {
   static {
-    _c_8=_i(this);
+    _c_9=_i(this);
   }
   static defaultWrap;
   static wrapMap;
@@ -3384,9 +3780,9 @@ let _c_8=Lazy((_i) => class $StartupCode_DomUtility {
     this.defaultWrap=[0, "", ""];
   }
 });
-let _c_9=Lazy((_i) => class $StartupCode_Animation {
+let _c_10=Lazy((_i) => class $StartupCode_Animation {
   static {
-    _c_9=_i(this);
+    _c_10=_i(this);
   }
   static UseAnimations;
   static CubicInOut;
@@ -3430,42 +3826,19 @@ function Concat_1(xs){
   return TreeReduce(Empty(), Append_1, x);
 }
 function Empty(){
-  return _c_11.Empty;
+  return _c_12.Empty;
 }
-function AjaxProvider(){
-  return _c_10.AjaxProvider;
-}
-function makePayload(data){
-  return JSON.stringify(data);
-}
-function makeHeaders(headers){
-  return NewFromSeq(map_2((_1) =>[_1[0], _1[1]], distinctBy_1((t) => t[0], headers.concat([["content-type", "application/json"]]))));
-}
-function EndPoint(){
-  return _c_10.EndPoint;
-}
-function ajax(async, url, headers, data, ok, err, csrf){
-  let xhr=new XMLHttpRequest();
-  let csrf_1=document.cookie.replace(new RegExp("(?:(?:^|.*;)\\s*csrftoken\\s*\\=\\s*([^;]*).*$)|^.*$"), "$1");
-  xhr.open("POST", url, async);
-  if(async==true)xhr.withCredentials=true;
-  let h;
-  for(var h_1 in headers)xhr.setRequestHeader(h_1, headers[h_1]);
-  if(csrf_1)xhr.setRequestHeader("x-csrftoken", csrf_1);
-  function k(){
-    if(xhr.status==200)ok(xhr.responseText);
-    else if(csrf&&xhr.status==403&&xhr.responseText=="CSRF")csrf();
-    else {
-      let msg="Response status is not 200: ";
-      err(new Error(msg+xhr.status));
-    }
+let _c_11=Lazy((_i) => class $StartupCode_Remoting {
+  static {
+    _c_11=_i(this);
   }
-  if("onload"in xhr)xhr.onload=xhr.onerror=xhr.onabort=k;
-  else xhr.onreadystatechange=() => {
-    if(xhr.readyState==4)k();
-  };
-  xhr.send(data);
-}
+  static AjaxProvider;
+  static EndPoint;
+  static {
+    this.EndPoint=globalThis.location.origin;
+    this.AjaxProvider=new XhrProvider();
+  }
+});
 function concat_3(o){
   let r=[];
   let k;
@@ -3528,17 +3901,13 @@ function Intersect_1(a, b){
   set_1.IntersectWith(ToArray_2(b));
   return set_1;
 }
-let _c_10=Lazy((_i) => class $StartupCode_Remoting {
-  static {
-    _c_10=_i(this);
+class XhrProvider extends Object_1 {
+  Async(url, headers, data, ok, err){
+    ajax(true, url, headers, data, ok, err, () => {
+      ajax(true, url, headers, data, ok, err, void 0);
+    });
   }
-  static AjaxProvider;
-  static EndPoint;
-  static {
-    this.EndPoint=globalThis.location.origin;
-    this.AjaxProvider=new XhrProvider();
-  }
-});
+}
 class DynamicAttrNode extends Object_1 {
   push;
   value;
@@ -3637,13 +4006,6 @@ function DocChildren(node){
 function DomNodes(Item){
   return{$:0, $0:Item};
 }
-class XhrProvider extends Object_1 {
-  Async(url, headers, data, ok, err){
-    ajax(true, url, headers, data, ok, err, () => {
-      ajax(true, url, headers, data, ok, err, void 0);
-    });
-  }
-}
 function Create(f){
   return New_6(false, f, forceLazy);
 }
@@ -3657,9 +4019,9 @@ function forceLazy(){
 function cachedLazy(){
   return this.v;
 }
-let _c_11=Lazy((_i) => class $StartupCode_AppendList {
+let _c_12=Lazy((_i) => class $StartupCode_AppendList {
   static {
-    _c_11=_i(this);
+    _c_12=_i(this);
   }
   static Empty;
   static {

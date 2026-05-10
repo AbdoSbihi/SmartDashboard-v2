@@ -16,6 +16,17 @@ module Client =
     let cityInput   : Var<string>   = Var.Create "Budapest"
     let amountInput : Var<string>   = Var.Create "1"
 
+    // ── NEW FEATURE STATE 
+    // Dark/Light mode — true = dark (default)
+    let isDark      : Var<bool>   = Var.Create true
+    // Celsius/Fahrenheit — true = Celsius (default)
+    let isCelsius   : Var<bool>   = Var.Create true
+    // Clock — current time string
+    let clockTime   : Var<string> = Var.Create ""
+    let clockDate   : Var<string> = Var.Create ""
+    // Refresh countdown — seconds until next auto-refresh
+    let countdown   : Var<int>    = Var.Create 300   
+
     // ── HELPERS 
     let getElementValue (el: Dom.Element) : string =
         JS.Get<string> "value" el
@@ -28,18 +39,73 @@ module Client =
     let weatherIcon (code: string) : string =
         "https://openweathermap.org/img/wn/" + code + "@2x.png"
 
-    let fmtTemp (t: float) : string =
-        sprintf "%.1f°C" t
+    // Temperature formatting 
+    let fmtTemp (tempC: float) : string =
+        if isCelsius.Value then
+            sprintf "%.1f°C" tempC
+        else
+            let f = tempC * 9.0 / 5.0 + 32.0
+            sprintf "%.1f°F" f
 
-    // ── ELEMENT HELPERS 
+    // Element helpers 
     let el (tag: string) (cls: string) (children: Doc list) : Doc =
         Doc.Element tag [attr.``class`` cls] children
 
     let elA (tag: string) (attrs: Attr list) (children: Doc list) : Doc =
         Doc.Element tag attrs children
 
-    let txt (s: string) : Doc =
-        Doc.TextNode s
+    let txt (s: string) : Doc = Doc.TextNode s
+
+    // ── APPLY THEME 
+    let applyTheme (dark: bool) =
+        let body = JS.Document.Body
+        if dark then
+            body.SetAttribute("data-theme", "dark")
+        else
+            body.SetAttribute("data-theme", "light")
+
+    // ── CLOCK LOOP 
+    let startClock () =
+        async {
+            while true do
+                let now = DateTime.Now
+                clockTime.Value <- now.ToString("HH:mm:ss")
+                clockDate.Value <- now.ToString("dddd, MMMM dd yyyy")
+                do! Async.Sleep 1000
+        } |> Async.Start
+
+    // ── REFRESH TIMER LOOP 
+    let startRefreshTimer () =
+        async {
+            while true do
+                do! Async.Sleep 1000
+                let c = countdown.Value - 1
+                if c <= 0 then
+                    countdown.Value <- 300
+                    let s = state.Value
+                    setWeather Fetching
+                    setForecast Fetching
+                    setNews Fetching
+                    setCurrency Fetching
+                    let! wr = Server.GetWeather s.City
+                    match wr with
+                    | Ok d -> setWeather (Loaded d)
+                    | Error e -> setWeather (Failed e)
+                    let! fr = Server.GetForecast s.City
+                    match fr with
+                    | Ok d -> setForecast (Loaded d)
+                    | Error e -> setForecast (Failed e)
+                    let! nr = Server.GetNews s.NewsCategory.ApiValue
+                    match nr with
+                    | Ok d -> setNews (Loaded d)
+                    | Error e -> setNews (Failed e)
+                    let! cr = Server.GetCurrencyRates s.BaseCurrency
+                    match cr with
+                    | Ok d -> setCurrency (Loaded d)
+                    | Error e -> setCurrency (Failed e)
+                else
+                    countdown.Value <- c
+        } |> Async.Start
 
     // ── LOAD FUNCTIONS 
     let loadWeather (city: string) =
@@ -107,48 +173,59 @@ module Client =
         | Failed e -> el "div" "widget-error"   [txt ("Error: " + e)]
         | Loaded d -> render d
 
+    // ── CLOCK WIDGET 
+    let clockWidget () : Doc =
+        el "div" "clock-widget" [
+            clockTime.View |> Doc.BindView (fun t ->
+                el "div" "clock-time" [txt t])
+            clockDate.View |> Doc.BindView (fun d ->
+                el "div" "clock-date" [txt d])
+        ]
+
     // ── WEATHER 
     let weatherContent (data: WeatherData) : Doc =
         let temp     : float = data.TempC
         let feels    : float = data.FeelsLike
         let wind     : float = data.WindSpeed
         let humidity : int   = data.Humidity
-        let humStr = string humidity + "%"
+        let humStr  = string humidity + "%"
         let windStr = sprintf "%.1f m/s" wind
-        el "div" "weather-main" [
-            el "div" "weather-top" [
-                elA "img" [
-                    attr.src (weatherIcon data.Condition.Icon)
-                    attr.``class`` "weather-icon-img"
-                    attr.alt data.Condition.Description
-                ] []
-                el "div" "weather-info" [
-                    el "div" "weather-temp" [txt (fmtTemp temp)]
-                    el "div" "weather-city" [txt (data.City + ", " + data.Country)]
-                    el "div" "weather-desc" [txt data.Condition.Description]
+        isCelsius.View |> Doc.BindView (fun _ ->
+            el "div" "weather-main" [
+                el "div" "weather-top" [
+                    elA "img" [
+                        attr.src (weatherIcon data.Condition.Icon)
+                        attr.``class`` "weather-icon-img"
+                        attr.alt data.Condition.Description
+                    ] []
+                    el "div" "weather-info" [
+                        el "div" "weather-temp" [txt (fmtTemp temp)]
+                        el "div" "weather-city" [txt (data.City + ", " + data.Country)]
+                        el "div" "weather-desc" [txt data.Condition.Description]
+                    ]
                 ]
-            ]
-            el "div" "weather-details" [
-                el "div" "weather-detail" [el "span" "detail-label" [txt "Feels like"]; el "span" "detail-value" [txt (fmtTemp feels)]]
-                el "div" "weather-detail" [el "span" "detail-label" [txt "Humidity"];   el "span" "detail-value" [txt humStr]]
-                el "div" "weather-detail" [el "span" "detail-label" [txt "Wind"];       el "span" "detail-value" [txt windStr]]
-            ]
-        ]
+                el "div" "weather-details" [
+                    el "div" "weather-detail" [el "span" "detail-label" [txt "Feels like"]; el "span" "detail-value" [txt (fmtTemp feels)]]
+                    el "div" "weather-detail" [el "span" "detail-label" [txt "Humidity"];   el "span" "detail-value" [txt humStr]]
+                    el "div" "weather-detail" [el "span" "detail-label" [txt "Wind"];       el "span" "detail-value" [txt windStr]]
+                ]
+            ])
 
     let forecastContent (days: ForecastDay list) : Doc =
-        let dayDocs : Doc list =
-            days |> List.map (fun d ->
-                let tmax : float = d.TempMax
-                let tmin : float = d.TempMin
-                el "div" "forecast-day" [
-                    el "div" "forecast-date" [txt d.Date]
-                    elA "img" [attr.src (weatherIcon d.Icon); attr.``class`` "forecast-icon"; attr.alt d.Desc] []
-                    el "div" "forecast-temps" [
-                        el "span" "temp-max" [txt (fmtTemp tmax)]
-                        el "span" "temp-min" [txt (fmtTemp tmin)]
-                    ]
-                ])
-        el "div" "forecast-row" dayDocs
+        isCelsius.View |> Doc.BindView (fun _ ->
+            let dayDocs : Doc list =
+                days |> List.map (fun d ->
+                    let tmax : float = d.TempMax
+                    let tmin : float = d.TempMin
+                    el "div" "forecast-day" [
+                        el "div" "forecast-date" [txt d.Date]
+                        elA "img" [attr.src (weatherIcon d.Icon); attr.``class`` "forecast-icon"; attr.alt d.Desc] []
+                        el "div" "forecast-temps" [
+                            el "span" "temp-max" [txt (fmtTemp tmax)]
+                            el "span" "temp-min" [txt (fmtTemp tmin)]
+                        ]
+                    ])
+            el "div" "forecast-row" dayDocs)
 
     let weatherWidget () : Doc =
         let searchBar =
@@ -163,8 +240,15 @@ module Client =
                             loadWeather city)
                 ] [txt "Search"]
             ]
+        // Unit toggle button
+        let unitToggle =
+            isCelsius.View |> Doc.BindView (fun c ->
+                elA "button" [
+                    attr.``class`` "btn-unit"
+                    on.click (fun _ _ -> isCelsius.Value <- not isCelsius.Value)
+                ] [txt (if c then "Switch to °F" else "Switch to °C")])
         el "div" "weather-widget" [
-            searchBar
+            el "div" "weather-controls" [searchBar; unitToggle]
             state.View |> Doc.BindView (fun s ->
                 let wDoc = renderWidgetState s.Weather weatherContent
                 let fDoc =
@@ -219,7 +303,6 @@ module Client =
                     then [attr.value code; attr.selected "selected"]
                     else [attr.value code]
                 elA "option" attrs [txt (flag + " " + code + " - " + name)])
-
         let baseSelector =
             el "div" "currency-controls" [
                 el "div" "form-field" [
@@ -237,7 +320,6 @@ module Client =
                     Doc.InputType.Text [attr.``class`` "form-input"; attr.placeholder "1.00"] amountInput
                 ]
             ]
-
         let ratesTable (rates: CurrencyRates) : Doc =
             let amountVal =
                 match Double.TryParse(amountInput.Value) with
@@ -258,17 +340,10 @@ module Client =
             el "div" "rates-wrap" [
                 el "div" "currency-updated" [txt ("Updated: " + rates.UpdatedAt)]
                 elA "table" [attr.``class`` "rates-table"] [
-                    elA "thead" [] [
-                        elA "tr" [] [
-                            elA "th" [] [txt "Currency"]
-                            elA "th" [] [txt "Rate"]
-                            elA "th" [] [txt "Converted"]
-                        ]
-                    ]
+                    elA "thead" [] [elA "tr" [] [elA "th" [] [txt "Currency"]; elA "th" [] [txt "Rate"]; elA "th" [] [txt "Converted"]]]
                     elA "tbody" [] rowDocs
                 ]
             ]
-
         el "div" "currency-widget" [
             baseSelector
             View.Map2
@@ -288,6 +363,18 @@ module Client =
                     el "div" "settings-row" [el "span" "settings-label" [txt "Default City"];     el "span" "settings-value" [txt s.City]]
                     el "div" "settings-row" [el "span" "settings-label" [txt "News Category"];    el "span" "settings-value" [txt s.NewsCategory.Label]]
                     el "div" "settings-row" [el "span" "settings-label" [txt "Base Currency"];    el "span" "settings-value" [txt s.BaseCurrency]]
+                ])
+            // Unit preference display
+            isCelsius.View |> Doc.BindView (fun c ->
+                el "div" "settings-row" [
+                    el "span" "settings-label" [txt "Temperature Unit"]
+                    el "span" "settings-value" [txt (if c then "Celsius (°C)" else "Fahrenheit (°F)")]
+                ])
+            // Theme preference display
+            isDark.View |> Doc.BindView (fun d ->
+                el "div" "settings-row" [
+                    el "span" "settings-label" [txt "Theme"]
+                    el "span" "settings-value" [txt (if d then "Dark" else "Light")]
                 ])
             saved.View |> Doc.BindView (fun msg ->
                 if msg = "" then Doc.Empty
@@ -323,13 +410,33 @@ module Client =
                     el "span" "nav-label" [txt label]
                 ])
 
+        // Dark/Light toggle button in sidebar
+        let themeToggle : Doc =
+            isDark.View |> Doc.BindView (fun dark ->
+                elA "button" [
+                    attr.``class`` "btn-theme"
+                    on.click (fun _ _ ->
+                        let next = not isDark.Value
+                        isDark.Value <- next
+                        applyTheme next)
+                ] [txt (if dark then "☀ Light Mode" else "🌙 Dark Mode")])
+
+        // Refresh countdown display
+        let refreshDisplay : Doc =
+            countdown.View |> Doc.BindView (fun c ->
+                let mins = c / 60
+                let secs = c % 60
+                el "div" "refresh-countdown" [
+                    txt (sprintf "Auto-refresh in %d:%02d" mins secs)
+                ])
+
         let mainContent : Doc =
             activeTab.View |> Doc.BindView (fun tab ->
                 match tab with
-                | WeatherTab  -> widgetCard "Weather & Forecast" "🌤" (fun () -> loadWeather state.Value.City)        (weatherWidget ())
-                | NewsTab     -> widgetCard "Top Headlines"      "📰" (fun () -> loadNews state.Value.NewsCategory)   (newsWidget ())
+                | WeatherTab  -> widgetCard "Weather & Forecast" "🌤" (fun () -> loadWeather state.Value.City)         (weatherWidget ())
+                | NewsTab     -> widgetCard "Top Headlines"      "📰" (fun () -> loadNews state.Value.NewsCategory)    (newsWidget ())
                 | CurrencyTab -> widgetCard "Currency Exchange"  "💱" (fun () -> loadCurrency state.Value.BaseCurrency)(currencyWidget ())
-                | SettingsTab -> widgetCard "Settings"           "⚙"  (fun () -> ())                                  (settingsWidget ()))
+                | SettingsTab -> widgetCard "Settings"           "⚙"  (fun () -> ())                                   (settingsWidget ()))
 
         el "div" "app-shell" [
             elA "nav" [attr.``class`` "sidebar"] [
@@ -337,11 +444,17 @@ module Client =
                     el "div" "brand-title" [txt "SmartDash"]
                     el "div" "brand-sub"   [txt "Live Dashboard"]
                 ]
+                // Clock in sidebar
+                clockWidget ()
                 el "div" "nav-items" [
                     navItem WeatherTab  "🌤" "Weather"
                     navItem NewsTab     "📰" "News"
                     navItem CurrencyTab "💱" "Currency"
                     navItem SettingsTab "⚙"  "Settings"
+                ]
+                el "div" "sidebar-footer" [
+                    themeToggle
+                    refreshDisplay
                 ]
             ]
             Doc.Element "main" [attr.``class`` "main-content"] [mainContent]
@@ -349,5 +462,8 @@ module Client =
 
     [<SPAEntryPoint>]
     let Main () =
+        applyTheme true
+        startClock ()
+        startRefreshTimer ()
         loadAll ()
         renderApp () |> Doc.RunById "main"
