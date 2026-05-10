@@ -41,6 +41,18 @@ Currency — live exchange rates for 10 currencies
 Settings — save preferred city, category, and currency per session
 
 
+* Additional Features : (v2)
+  
+   * The dashboard includes four extra features :
+      - A live clock displayed in the sidebar updates every second using a recursive async loop. 
+      - A dark/light mode toggle switches the entire colour scheme instantly by setting a data-theme attribute on the body.
+      - A temperature unit toggle switches all displayed temperatures between Celsius and Fahrenheit in real time , the conversion is reactive, meaning every temperature on screen re-renders the moment the unit changes.         - An auto-refresh timer counts down from 5 minutes in the sidebar footer and automatically re-fetches all three APIs when it reaches zero, implemented as a second recursive async loop running in parallel with the clock.
+
+
+
+        <img width="1910" height="995" alt="1" src="https://github.com/user-attachments/assets/6cfb406a-f7df-4b5b-b893-b8a4a321c5cc" />
+
+
 * Tech Stack :
   
 Language: F# (.NET 10)
