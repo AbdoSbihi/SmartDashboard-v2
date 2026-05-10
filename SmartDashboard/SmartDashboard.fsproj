@@ -18,22 +18,16 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="WebSharper" Version="10.0.0.652" />
-		<PackageReference Include="WebSharper.UI" Version="10.0.0.652" />
+		<PackageReference Include="WebSharper"            Version="10.0.0.652" />
+		<PackageReference Include="WebSharper.UI"         Version="10.0.0.652" />
 		<PackageReference Include="WebSharper.AspNetCore" Version="10.0.0.652" />
-		<PackageReference Include="WebSharper.FSharp" Version="10.0.0.652" />
+		<PackageReference Include="WebSharper.FSharp"     Version="10.0.0.652" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<Content Include="Main.html">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Content Update="wwwroot\Main.html">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </Content>
 	</ItemGroup>
 
 </Project>

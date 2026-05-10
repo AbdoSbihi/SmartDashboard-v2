@@ -106,7 +106,7 @@ module Currency =
     ]
     let codes = supported |> List.map (fun (c,_,_) -> c)
 
-// ── WIDGET STATE 
+
 [<JavaScript>]
 type WidgetState<'T> =
     | Idle
@@ -114,7 +114,7 @@ type WidgetState<'T> =
     | Loaded of 'T
     | Failed of string
 
-// ── APP STATE ─────────────────────────────────────────────────
+// ── APP STATE 
 [<JavaScript>]
 type AppState = {
     Weather      : WidgetState<WeatherData>

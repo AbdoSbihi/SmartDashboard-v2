@@ -56,7 +56,7 @@ module Server =
         | Some v -> v.GetInt32()
         | None   -> 0
 
-    // ── GetWeather
+    // ── GetWeather 
     [<Rpc>]
     let GetWeather (city: string) : Async<Result<WeatherData, string>> =
         async {
@@ -196,35 +196,29 @@ module Server =
     let GetCurrencyRates (baseCurrency: string) : Async<Result<CurrencyRates, string>> =
         async {
             try
-                let key = Config.get "ExchangeKey"
+                let symbols = Currency.codes |> List.filter (fun c -> c <> baseCurrency) |> String.concat ","
                 let url = sprintf
-                            "https://v6.exchangerate-api.com/v6/%s/latest/%s"
-                            key baseCurrency
+                            "https://api.frankfurter.app/latest?from=%s&to=%s"
+                            baseCurrency symbols
                 let! doc    = Http.getJson url
                 let root    = doc.RootElement
-                let result  = str root "result"
-                if result <> "success" then
-                    return Error (str root "error-type")
-                else
-                    let ratesEl   = root.GetProperty("conversion_rates")
-                    let updatedAt = str root "time_last_update_utc"
-                    let rates =
-                        Currency.supported
-                        |> List.choose (fun (code, name, flag) ->
+                let ratesEl = root.GetProperty("rates")
+                let date    = str root "date"
+                let rates =
+                    Currency.supported
+                    |> List.choose (fun (code, name, flag) ->
+                        if code = baseCurrency then
+                            Some { Code = code; Name = name; Rate = 1.0; Flag = flag }
+                        else
                             let mutable tmp = Unchecked.defaultof<JsonElement>
                             if ratesEl.TryGetProperty(code, &tmp) then
-                                Some {
-                                    Code = code
-                                    Name = name
-                                    Rate = tmp.GetDouble()
-                                    Flag = flag
-                                }
+                                Some { Code = code; Name = name; Rate = tmp.GetDouble(); Flag = flag }
                             else None)
-                    return Ok {
-                        Base      = baseCurrency
-                        Rates     = rates
-                        UpdatedAt = updatedAt
-                    }
+                return Ok {
+                    Base      = baseCurrency
+                    Rates     = rates
+                    UpdatedAt = date
+                }
             with ex ->
                 return Error (sprintf "Currency: %s" ex.Message)
         }

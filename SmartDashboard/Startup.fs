@@ -2,6 +2,7 @@ module SmartDashboard.Startup
 
 open System
 open System.Diagnostics
+open System.IO
 open System.Runtime.InteropServices
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
@@ -24,12 +25,26 @@ type Startup(configuration: IConfiguration) =
     member _.Configure(app: IApplicationBuilder, env: IWebHostEnvironment) =
         if env.IsDevelopment() then
             app.UseDeveloperExceptionPage() |> ignore
+
         let df = DefaultFilesOptions()
         df.DefaultFileNames.Clear()
         df.DefaultFileNames.Add("Main.html")
         app.UseDefaultFiles(df) |> ignore
         app.UseStaticFiles()    |> ignore
         app.UseWebSharper()     |> ignore
+
+        app.Run(fun ctx ->
+            async {
+                let path =
+                    let p1 = Path.Combine(env.ContentRootPath, "wwwroot", "Main.html")
+                    if File.Exists(p1) then p1
+                    else Path.Combine(env.ContentRootPath, "Main.html")
+                ctx.Response.ContentType <- "text/html"
+                let! bytes = File.ReadAllBytesAsync(path) |> Async.AwaitTask
+                do! ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length) |> Async.AwaitTask
+            } |> Async.StartAsTask :> System.Threading.Tasks.Task
+        ) |> ignore
+
 
 let openBrowser (url: string) =
     try
@@ -41,6 +56,7 @@ let openBrowser (url: string) =
             Process.Start("xdg-open", url) |> ignore
     with ex ->
         printfn "Could not open browser: %s" ex.Message
+
 
 [<EntryPoint>]
 let main argv =

@@ -17,14 +17,14 @@ module Client =
     let amountInput : Var<string>   = Var.Create "1"
 
     // ── NEW FEATURE STATE 
-    // Dark/Light mode — true = dark (default)
+    // Dark/Light mode : true = dark (default)
     let isDark      : Var<bool>   = Var.Create true
-    // Celsius/Fahrenheit — true = Celsius (default)
+    // Celsius/Fahrenheit : true = Celsius (default)
     let isCelsius   : Var<bool>   = Var.Create true
-    // Clock — current time string
+    // Clock : current time string
     let clockTime   : Var<string> = Var.Create ""
     let clockDate   : Var<string> = Var.Create ""
-    // Refresh countdown — seconds until next auto-refresh
+    // Refresh countdown : seconds until next auto-refresh
     let countdown   : Var<int>    = Var.Create 300   
 
     // ── HELPERS 
@@ -39,7 +39,6 @@ module Client =
     let weatherIcon (code: string) : string =
         "https://openweathermap.org/img/wn/" + code + "@2x.png"
 
-    // Temperature formatting 
     let fmtTemp (tempC: float) : string =
         if isCelsius.Value then
             sprintf "%.1f°C" tempC
@@ -47,7 +46,7 @@ module Client =
             let f = tempC * 9.0 / 5.0 + 32.0
             sprintf "%.1f°F" f
 
-    // Element helpers 
+
     let el (tag: string) (cls: string) (children: Doc list) : Doc =
         Doc.Element tag [attr.``class`` cls] children
 
@@ -240,7 +239,6 @@ module Client =
                             loadWeather city)
                 ] [txt "Search"]
             ]
-        // Unit toggle button
         let unitToggle =
             isCelsius.View |> Doc.BindView (fun c ->
                 elA "button" [
@@ -410,7 +408,6 @@ module Client =
                     el "span" "nav-label" [txt label]
                 ])
 
-        // Dark/Light toggle button in sidebar
         let themeToggle : Doc =
             isDark.View |> Doc.BindView (fun dark ->
                 elA "button" [
@@ -421,7 +418,6 @@ module Client =
                         applyTheme next)
                 ] [txt (if dark then "☀ Light Mode" else "🌙 Dark Mode")])
 
-        // Refresh countdown display
         let refreshDisplay : Doc =
             countdown.View |> Doc.BindView (fun c ->
                 let mins = c / 60

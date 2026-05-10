@@ -586,6 +586,175 @@
             .btn-save:hover {
                 opacity: 0.85;
             }
+
+        /* ── DARK / LIGHT THEME ── */
+        :root {
+            --bg: #0f1117;
+            --bg2: #1a1a2e;
+            --border: rgba(255,255,255,0.07);
+            --text: #e0e0e0;
+            --text-sub: #808090;
+            --card-bg: rgba(255,255,255,0.04);
+            --input-bg: rgba(255,255,255,0.07);
+            --accent: #e94560;
+        }
+
+        [data-theme="light"] {
+            --bg: #f0f2f5;
+            --bg2: #ffffff;
+            --border: rgba(0,0,0,0.08);
+            --text: #1a1a2e;
+            --text-sub: #666680;
+            --card-bg: rgba(0,0,0,0.02);
+            --input-bg: rgba(0,0,0,0.05);
+            --accent: #e94560;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            transition: background 0.3s, color 0.3s;
+        }
+
+        .sidebar {
+            background: var(--bg2);
+            border-right: 1px solid var(--border);
+        }
+
+        .widget-card {
+            background: var(--card-bg);
+            border-color: var(--border);
+        }
+
+        .widget-header {
+            background: var(--card-bg);
+            border-color: var(--border);
+        }
+
+        .nav-btn {
+            color: var(--text-sub);
+        }
+
+            .nav-btn:hover {
+                color: var(--text);
+            }
+
+        .brand-sub {
+            color: var(--text-sub);
+        }
+
+        .form-select, .form-input, .search-input {
+            background: var(--input-bg);
+            color: var(--text);
+            border-color: var(--border);
+        }
+
+        .weather-detail {
+            background: var(--card-bg);
+        }
+
+        .forecast-day {
+            background: var(--card-bg);
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+        }
+
+        .settings-row {
+            background: var(--card-bg);
+        }
+
+        /* ── CLOCK ── */
+        .clock-widget {
+            padding: 0.75rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 0.5rem;
+        }
+
+        .clock-time {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: var(--accent);
+            letter-spacing: 2px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .clock-date {
+            font-size: 0.7rem;
+            color: var(--text-sub);
+            margin-top: 0.1rem;
+        }
+
+        /* ── SIDEBAR FOOTER ── */
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 1rem 0.75rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        /* ── THEME TOGGLE ── */
+        .btn-theme {
+            width: 100%;
+            padding: 0.55rem 1rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-align: left;
+        }
+
+            .btn-theme:hover {
+                background: rgba(233,69,96,0.15);
+                color: var(--accent);
+            }
+
+        /* ── REFRESH COUNTDOWN ── */
+        .refresh-countdown {
+            font-size: 0.72rem;
+            color: var(--text-sub);
+            text-align: center;
+            padding: 0.25rem 0;
+        }
+
+        /* ── UNIT TOGGLE ── */
+        .weather-controls {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+            .weather-controls .search-bar {
+                flex: 1;
+                margin-bottom: 0;
+            }
+
+        .btn-unit {
+            padding: 0.55rem 1rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+
+            .btn-unit:hover {
+                background: rgba(233,69,96,0.15);
+                color: var(--accent);
+            }
     </style>
 </head>
 <body>
